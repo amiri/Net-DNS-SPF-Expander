@@ -66,17 +66,19 @@ has 'to_ignore' => (
 );
 
 has 'expansions' => (
-    is      => 'rw',
-    isa     => 'HashRef',
-    default => sub { {} },
+    is         => 'rw',
+    isa        => 'HashRef',
+    lazy_build => 1,
 );
 
 sub _build_resolver {
     my $self = shift;
-    return Net::DNS::Resolver->new(
-        recurse => 1,
-        #debug => 1,
-    );
+    return Net::DNS::Resolver->new( recurse => 1, );
+}
+
+sub _build_expansions {
+    my $self = shift;
+    return $self->_expand;
 }
 
 sub _build_destination_file {
@@ -92,9 +94,7 @@ sub _build_parsed_file {
 }
 
 sub _build_resource_records {
-    my $self = shift;
-
-    #warn p $self->parsed_file;
+    my $self             = shift;
     my @resource_records = $self->parsed_file->read;
     return \@resource_records;
 }
@@ -117,37 +117,28 @@ sub _normalize_component {
     my ( $self, $component ) = @_;
     my $return = $component;
     $return =~ s/^.+?://g;
-
-    #warn "Return for $component is $return";
     return $return;
 }
 
 sub _perform_expansion {
     my ( $self, $component ) = @_;
-
-    #warn "My component in expansion is: ", p $component;
     $component = $self->_normalize_component($component);
     my $packet = $self->resolver->search( $component, 'TXT', 'IN' );
+    return unless ($packet) && $packet->isa('Net::DNS::Packet');
     my ($answer) = $packet->answer;
-
-    #warn p $answer;
-    #warn "Is my answer blessed? ", Scalar::Util::blessed($answer);
+    return unless ($answer) && $answer->isa('Net::DNS::RR::TXT');
     my $data = $answer->txtdata;
-
-    #warn "Data: $data";
     return $data;
 }
 
 sub _expand_spf_component {
     my ( $self, $component, $expansions ) = @_;
-    warn "Expansions upon entering sub: ", p $expansions;
-    $expansions ||= [];
-    return unless $component;
-    if ( scalar( split( ' ', $component ) ) > 1 ) {
 
-        #warn "The number of components I split are "
-        #. scalar( split( ' ', $component ) );
-        #warn "In first if for $component";
+    $expansions ||= [];
+
+    return unless $component;
+
+    if ( scalar( split( ' ', $component ) ) > 1 ) {
         my @components = split( ' ', $component );
         for my $component (@components) {
             $self->_expand_spf_component( $component, $expansions );
@@ -155,36 +146,24 @@ sub _expand_spf_component {
     }
     else {
 
-        #warn "In else for $component";
-
         if ( ( any { $component =~ $_ } @{ $self->to_ignore } ) ) {
-            return;
+            return $component;
         }
-        if ( ( any { $component =~ $_ } @{ $self->to_copy } ) ) {
-
-            #warn "Pushing $component onto expansions";
+        elsif ( ( any { $component =~ $_ } @{ $self->to_copy } ) ) {
             push @{$expansions}, $component;
-
-            #warn "Expansions after pushing: ", p $expansions;
-
         }
-        else {
+        elsif ( ( any { $component =~ $_ } @{ $self->to_expand } ) ) {
             my $new_component = $self->_perform_expansion($component);
             $self->_expand_spf_component( $new_component, $expansions );
         }
-
-#push @{$expansions}, $component if any { $component =~ $_ } @{ $self->to_ignore };
-#push @{$expansions}, $component if any { $component =~ $_ } @{ $self->to_copy };
-#$return->{$component} = $component
-#if any { $component =~ $_ } @{ $self->to_ignore };
-#$return->{$component} = $component
-#if any { $component =~ $_ } @{ $self->to_copy };
+        else {
+            return $component;
+        }
     }
-    warn "Expansions for $component before returning: ", p $expansions;
     return ( $component, $expansions );
 }
 
-sub expand {
+sub _expand {
     my $self     = shift;
     my %spf_hash = ();
     for my $spf_record ( @{ $self->spf_records } ) {
@@ -193,10 +172,9 @@ sub expand {
             my ( $comp, $expansions ) =
               $self->_expand_spf_component($spf_component);
             $spf_hash{ $spf_record->name }{$spf_component} = $expansions;
-
         }
     }
-    warn p %spf_hash;
+    return \%spf_hash;
 }
 
 1;
