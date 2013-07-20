@@ -1,3 +1,5 @@
+$ORIGIN test_zone.com.
+
 ; ORIGINAL SPF RECORDS:
 ;
 ;@               TXT     "v=spf1 include:_spf.google.com ~all"
