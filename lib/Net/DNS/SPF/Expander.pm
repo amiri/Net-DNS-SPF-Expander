@@ -85,6 +85,22 @@ has 'maximum_record_length' => (
     },
 );
 
+has 'ttl' => (
+    is => 'ro',
+    isa => 'Str',
+    default => sub {
+        '10M',
+    },
+);
+
+has 'record_class' => (
+    is => 'ro',
+    isa => 'Str',
+    default => sub {
+        'IN',
+    },
+);
+
 sub _build_resolver {
     my $self = shift;
     return Net::DNS::Resolver->new( recurse => 1, );
@@ -197,7 +213,6 @@ sub _expand {
           $self->_extract_expansion_elements( $spf_hash{ $spf_record->name } );
         $spf_hash{ $spf_record->name }{elements} = $expansion_elements;
     }
-    warn p %spf_hash;
     return \%spf_hash;
 }
 
@@ -234,12 +249,12 @@ sub new_spf_records {
         # including the spf version and trailing ~all.
         if ( $lengths->{$domain} > $self->maximum_record_length ) {
             $new_records =
-              $self->new_records_from_partition(
+              $self->new_records_from_partition( $domain,
                 $expansions->{$domain}{elements} );
         }
         else {
             $new_records =
-              $self->new_records_from_arrayref(
+              $self->new_records_from_arrayref($domain,
                 $expansions->{$domain}{elements} );
         }
         push @new_spf_records, $new_records;
@@ -248,16 +263,26 @@ sub new_spf_records {
 }
 
 sub new_records_from_arrayref {
-    my ( $self, $expansions ) = @_;
-    warn "Expansions in records from arrayref: ", p $expansions;
-     
+    my ( $self, $domain, $expansions ) = @_;
+
+    my @new_records = ();
+    for my $type ('TXT','SPF') {
+        push @new_records, new Net::DNS::RR(
+            type    => $type,
+            name    => $domain,
+            class => $self->record_class,
+            ttl => $self->ttl,
+            txtdata => join(' ', @$expansions),
+          );
+    }
+    return \@new_records;
 }
 
 sub new_records_from_partition {
-    my ( $self, $elements ) = @_;
+    my ( $self, $domain, $elements ) = @_;
     my $record_string = join( ' ', @$elements );
     my $record_length = length($record_string);
-    my $max_length = $self->max_record_length;
+    my $max_length = $self->maximum_record_length;
     my $offset        = 0;
     my $result        = index( $record_string, ' ', $offset );
     my @space_indices = ();
@@ -267,20 +292,25 @@ sub new_records_from_partition {
         $offset = $result + 1;
         $result = index( $record_string, ' ', $offset );
     }
+
     my $number_of_partitions =
       int( $record_length / $max_length ) +
       ( ($record_length % $max_length) ? 1 : 0 );
+
     my @partitions       = ();
     my $partition_offset = 0;
+
     for my $part ( 1 .. $number_of_partitions ) {
         my $split_point = first { $_ < $max_length * $part } reverse @space_indices;
         my $substring = substr( $record_string, $partition_offset, $split_point );
         push @partitions, [ split( ' ', $substring ) ];
         $partition_offset = $split_point;
     }
+
     my @return = ();
+
     for my $partition (@partitions) {
-        my $result = $self->new_records_from_arrayref($partition);
+        my $result = $self->new_records_from_arrayref($domain, $partition);
         push @return, $result;
     }
     return \@return;

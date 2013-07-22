@@ -17,7 +17,8 @@ my $expansions = $expander->expansions;
 my $new_records = $expander->new_spf_records;
 #diag p $expansions;
 #diag p $length;
-diag p $new_records;
+#diag p $new_records;
+diag $_->string for map { @{$_} } map { @{$_} } @$new_records;
 
 ok(1==1);
 #     *   {
