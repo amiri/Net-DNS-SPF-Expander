@@ -1,6 +1,7 @@
 package Net::DNS::SPF::Expander;
 
 use Moose;
+use IO::All -utf8;
 use Net::DNS::ZoneFile;
 use Net::DNS::Resolver;
 use MooseX::Types::IO::All 'IO_All';
@@ -337,7 +338,7 @@ sub _get_single_record_string {
 
     for my $record (@$record_set) {
         $record->name($name);
-        $record->txtdata = 'v=spf1 ' . $record->txtdata . ' ~all';
+        $record->txtdata = 'v=spf1 ' . $record->txtdata . ' ~all'."\n";
         push @record_strings, $record->string;
     }
     return \@record_strings;
@@ -385,38 +386,39 @@ sub _get_multiple_record_strings {
         }
     }
 
-    @record_strings = map { $_->string } @containing_records;
+    @record_strings = map { $_->string."\n" } @containing_records;
     return \@record_strings;
 }
 
 sub _get_master_record_strings {
-    my ( $self, $values ) = @_;
+    my ( $self, $values, $domains ) = @_;
 
-    my $origin = $self->origin;
-    my $name   = $self->_normalize_record_name($origin);
-
+    my $origin         = $self->origin;
     my @record_strings = ();
 
     my @containing_records = ();
     for my $type ( 'TXT', 'SPF' ) {
-        push @containing_records, new Net::DNS::RR(
-            type    => $type,
-            name    => $name,
-            class   => $self->record_class,
-            ttl     => $self->ttl,
-            txtdata => 'v=spf1 '
-              . (
-                join( ' ',
-                    ( map { "_spf$_.$origin" } ( 1 .. scalar(@$values) ) ) )
-              )
-              . ' ~all',
-        );
+        for my $domain (@$domains) {
+            my $name = $self->_normalize_record_name($domain);
+            push @containing_records, new Net::DNS::RR(
+                type    => $type,
+                name    => $name,
+                class   => $self->record_class,
+                ttl     => $self->ttl,
+                txtdata => 'v=spf1 '
+                  . (
+                    join( ' ',
+                        ( map { "_spf$_.$origin" } ( 1 .. scalar(@$values) ) ) )
+                  )
+                  . ' ~all',
+            );
+        }
     }
-    @record_strings = map { $_->string } @containing_records;
+    @record_strings = map { $_->string."\n" } @containing_records;
     return \@record_strings;
 }
 
-sub write {
+sub _new_records_lines {
     my $self           = shift;
     my %new_records    = %{ $self->new_spf_records || {} };
     my @record_strings = ();
@@ -432,12 +434,12 @@ sub write {
         }
     }
     @autosplit = uniq @autosplit;
-    warn p @autosplit;
 
     # If there are any autosplit SPF records, we just do that right away.
     if ( any { scalar( @{ $new_records{$_} } || [] ) > 1 } keys %new_records ) {
         my $master_record_strings =
-          $self->_get_master_record_strings( \@autosplit );
+          $self->_get_master_record_strings( \@autosplit,
+            [ keys %new_records ] );
         my $record_strings = $self->_get_multiple_record_strings( \@autosplit );
         push @record_strings, @$master_record_strings;
         push @record_strings, @$record_strings;
@@ -450,7 +452,34 @@ sub write {
             push @record_strings, $record_string;
         }
     }
-    return \@record_strings;
+    my @original_lines = $self->input_file->slurp; 
+    my @new_lines = ();
+    my @spf_indices;
+    my $i = 0;
+    LINE: for my $line (@original_lines) {
+        if ($line =~ /^[^;].+?v=spf1/) {
+            push @spf_indices, $i;
+            $line = ";".$line;
+        }
+        push @new_lines, $line; 
+        $i++;
+    }
+    my @first_segment = @new_lines[0 .. $spf_indices[-1]];
+    my @last_segment = @new_lines[$spf_indices[-1]+1 .. $#new_lines];
+    my @final_lines = (@first_segment, @record_strings, @last_segment);
+
+    return \@final_lines;
+}
+
+sub write {
+    my $self = shift;
+    my $lines = $self->_new_records_lines;
+    #warn p $lines;
+    my $path = $self->input_file->filepath;
+    my $name = $self->input_file->filename;
+    io("${path}${name}.bak")->print($self->input_file->all);
+    io("${path}${name}")->print(@$lines);
+    return 1;
 }
 
 1;
