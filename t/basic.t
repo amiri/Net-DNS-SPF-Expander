@@ -14,11 +14,14 @@ my $expander = Net::DNS::SPF::Expander->new(input_file => $file);
 
 my $expansions = $expander->expansions;
 #my $length = $expander->lengths_of_expansions;
-my $new_records = $expander->new_spf_records;
+my $write = $expander->write;
+diag p $write;
 #diag p $expansions;
 #diag p $length;
 #diag p $new_records;
-diag $_->string for map { @{$_} } map { @{$_} } @$new_records;
+#diag $_->string for map { @{$_} } map { @{$_} } @$new_records;
+
+
 
 ok(1==1);
 #     *   {

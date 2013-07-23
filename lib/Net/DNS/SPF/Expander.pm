@@ -4,7 +4,7 @@ use Moose;
 use Net::DNS::ZoneFile;
 use Net::DNS::Resolver;
 use MooseX::Types::IO::All 'IO_All';
-use List::AllUtils qw(sum any part first);
+use List::AllUtils qw(sum any part first uniq);
 use Scalar::Util ();
 use Data::Printer;
 
@@ -86,24 +86,35 @@ has 'maximum_record_length' => (
 );
 
 has 'ttl' => (
-    is => 'ro',
-    isa => 'Str',
+    is      => 'ro',
+    isa     => 'Str',
     default => sub {
-        '10M',
+        '10M',;
     },
 );
 
 has 'record_class' => (
-    is => 'ro',
-    isa => 'Str',
+    is      => 'ro',
+    isa     => 'Str',
     default => sub {
-        'IN',
+        'IN',;
     },
+);
+
+has 'origin' => (
+    is         => 'ro',
+    isa        => 'Str',
+    lazy_build => 1,
 );
 
 sub _build_resolver {
     my $self = shift;
     return Net::DNS::Resolver->new( recurse => 1, );
+}
+
+sub _build_origin {
+    my $self = shift;
+    return $self->parsed_file->origin;
 }
 
 sub _build_expansions {
@@ -240,7 +251,7 @@ sub new_spf_records {
     my $lengths    = $self->lengths_of_expansions;
     my $expansions = $self->expansions;
 
-    my @new_spf_records = ();
+    my %new_spf_records = ();
 
     for my $domain ( keys %$lengths ) {
         my $new_records = [];
@@ -254,26 +265,26 @@ sub new_spf_records {
         }
         else {
             $new_records =
-              $self->new_records_from_arrayref($domain,
+              $self->new_records_from_arrayref( $domain,
                 $expansions->{$domain}{elements} );
         }
-        push @new_spf_records, $new_records;
+        $new_spf_records{$domain} = $new_records;
     }
-    return \@new_spf_records;
+    return \%new_spf_records;
 }
 
 sub new_records_from_arrayref {
     my ( $self, $domain, $expansions ) = @_;
 
     my @new_records = ();
-    for my $type ('TXT','SPF') {
+    for my $type ( 'TXT', 'SPF' ) {
         push @new_records, new Net::DNS::RR(
             type    => $type,
             name    => $domain,
-            class => $self->record_class,
-            ttl => $self->ttl,
-            txtdata => join(' ', @$expansions),
-          );
+            class   => $self->record_class,
+            ttl     => $self->ttl,
+            txtdata => join( ' ', @$expansions ),
+        );
     }
     return \@new_records;
 }
@@ -282,7 +293,7 @@ sub new_records_from_partition {
     my ( $self, $domain, $elements ) = @_;
     my $record_string = join( ' ', @$elements );
     my $record_length = length($record_string);
-    my $max_length = $self->maximum_record_length;
+    my $max_length    = $self->maximum_record_length;
     my $offset        = 0;
     my $result        = index( $record_string, ' ', $offset );
     my @space_indices = ();
@@ -295,14 +306,16 @@ sub new_records_from_partition {
 
     my $number_of_partitions =
       int( $record_length / $max_length ) +
-      ( ($record_length % $max_length) ? 1 : 0 );
+      ( ( $record_length % $max_length ) ? 1 : 0 );
 
     my @partitions       = ();
     my $partition_offset = 0;
 
     for my $part ( 1 .. $number_of_partitions ) {
-        my $split_point = first { $_ < $max_length * $part } reverse @space_indices;
-        my $substring = substr( $record_string, $partition_offset, $split_point );
+        my $split_point =
+          first { $_ < $max_length * $part } reverse @space_indices;
+        my $substring =
+          substr( $record_string, $partition_offset, $split_point );
         push @partitions, [ split( ' ', $substring ) ];
         $partition_offset = $split_point;
     }
@@ -310,10 +323,134 @@ sub new_records_from_partition {
     my @return = ();
 
     for my $partition (@partitions) {
-        my $result = $self->new_records_from_arrayref($domain, $partition);
+        my $result = $self->new_records_from_arrayref( $domain, $partition );
         push @return, $result;
     }
     return \@return;
+}
+
+sub _get_single_record_string {
+    my ( $self, $domain, $record_set ) = @_;
+    my $origin         = $self->origin;
+    my $name           = $self->_normalize_record_name($domain);
+    my @record_strings = ();
+
+    for my $record (@$record_set) {
+        $record->name($name);
+        $record->txtdata = 'v=spf1 ' . $record->txtdata . ' ~all';
+        push @record_strings, $record->string;
+    }
+    return \@record_strings;
+}
+
+sub _normalize_record_name {
+    my ( $self, $domain ) = @_;
+    my $origin = $self->origin;
+    my $name;
+
+    if ( $domain eq $origin ) {
+        $name = '@';
+    }
+    elsif ( $domain =~ /^\.$/ ) {
+        $name = '@';
+    }
+    elsif ( $domain =~ /^\*/ ) {
+        $name = '*';
+    }
+    else {
+        $name = $domain;
+    }
+    return $name;
+}
+
+sub _get_multiple_record_strings {
+    my ( $self, $values ) = @_;
+    my $origin = $self->origin;
+
+    my @record_strings = ();
+
+    my @containing_records = ();
+
+    for my $type ( 'TXT', 'SPF' ) {
+        my $i = 1;
+        for my $value (@$values) {
+            push @containing_records, new Net::DNS::RR(
+                type    => $type,
+                name    => "_spf$i.$origin",
+                class   => $self->record_class,
+                ttl     => $self->ttl,
+                txtdata => $value,
+            );
+            $i++;
+        }
+    }
+
+    @record_strings = map { $_->string } @containing_records;
+    return \@record_strings;
+}
+
+sub _get_master_record_strings {
+    my ( $self, $values ) = @_;
+
+    my $origin = $self->origin;
+    my $name   = $self->_normalize_record_name($origin);
+
+    my @record_strings = ();
+
+    my @containing_records = ();
+    for my $type ( 'TXT', 'SPF' ) {
+        push @containing_records, new Net::DNS::RR(
+            type    => $type,
+            name    => $name,
+            class   => $self->record_class,
+            ttl     => $self->ttl,
+            txtdata => 'v=spf1 '
+              . (
+                join( ' ',
+                    ( map { "_spf$_.$origin" } ( 1 .. scalar(@$values) ) ) )
+              )
+              . ' ~all',
+        );
+    }
+    @record_strings = map { $_->string } @containing_records;
+    return \@record_strings;
+}
+
+sub write {
+    my $self           = shift;
+    my %new_records    = %{ $self->new_spf_records || {} };
+    my @record_strings = ();
+
+    # Make a list of the unique records in case we need it.
+    my %autosplit_config = ();
+    my @autosplit        = ();
+    for my $domain ( keys %new_records ) {
+        for my $record_set ( @{ $new_records{$domain} } ) {
+            for my $record (@$record_set) {
+                push @autosplit, $record->txtdata;
+            }
+        }
+    }
+    @autosplit = uniq @autosplit;
+    warn p @autosplit;
+
+    # If there are any autosplit SPF records, we just do that right away.
+    if ( any { scalar( @{ $new_records{$_} } || [] ) > 1 } keys %new_records ) {
+        my $master_record_strings =
+          $self->_get_master_record_strings( \@autosplit );
+        my $record_strings = $self->_get_multiple_record_strings( \@autosplit );
+        push @record_strings, @$master_record_strings;
+        push @record_strings, @$record_strings;
+    }
+    else {
+        for my $domain ( keys %new_records ) {
+            my $record_string =
+              $self->_get_single_record_string( $domain,
+                $new_records{$domain} );
+            push @record_strings, $record_string;
+        }
+    }
+    return \@record_strings;
 }
 
 1;
