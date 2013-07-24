@@ -21,6 +21,13 @@ has 'output_file' => (
     lazy_build => 1,
     coerce     => 1,
 );
+has 'backup_file' => (
+    is         => 'ro',
+    isa        => IO_All,
+    lazy_build => 1,
+    coerce     => 1,
+
+);
 has 'parsed_file' => (
     is         => 'ro',
     isa        => 'Net::DNS::ZoneFile',
@@ -123,9 +130,19 @@ sub _build_expansions {
     return $self->_expand;
 }
 
-sub _build_destination_file {
+sub _build_backup_file {
     my $self = shift;
-    return $self->input_file;
+    my $path = $self->input_file->filepath;
+    my $name = $self->input_file->filename;
+    return "${path}${name}.bak";
+
+}
+
+sub _build_output_file {
+    my $self = shift;
+    my $path = $self->input_file->filepath;
+    my $name = $self->input_file->filename;
+    return "${path}${name}.new";
 }
 
 sub _build_parsed_file {
@@ -333,33 +350,43 @@ sub new_records_from_partition {
 sub _get_single_record_string {
     my ( $self, $domain, $record_set ) = @_;
     my $origin         = $self->origin;
-    my $name           = $self->_normalize_record_name($domain);
+    #my $name           = $self->_normalize_record_name($domain);
     my @record_strings = ();
+    warn p $record_set;
 
     for my $record (@$record_set) {
-        $record->name($name);
-        $record->txtdata = 'v=spf1 ' . $record->txtdata . ' ~all'."\n";
-        push @record_strings, $record->string;
+        #$record->name($name);
+        $record->name($domain);
+        $record->txtdata('v=spf1 ' . $record->txtdata . ' ~all');
+        #. "\n";
+        push @record_strings, $self->_normalize_record_name($record->string)."\n";
     }
     return \@record_strings;
 }
 
 sub _normalize_record_name {
-    my ( $self, $domain ) = @_;
+    my ( $self, $record) = @_;
+
+    $record =~ /(.+?)\s/;
+    warn "My record is $record"; 
+    my $original_name = $1;
+    warn "My original name is $original_name";
     my $origin = $self->origin;
+    warn "My origin is $origin";
+
     my $name;
 
-    if ( $domain eq $origin ) {
+    if ( $original_name eq $origin ) {
         $name = '@';
     }
-    elsif ( $domain =~ /^\.$/ ) {
+    elsif ( $original_name =~ /^\.$/ ) {
         $name = '@';
     }
-    elsif ( $domain =~ /^\*/ ) {
+    elsif ( $original_name =~ /^\*/ ) {
         $name = '*';
     }
     else {
-        $name = $domain;
+        $name = $original_name;
     }
     return $name;
 }
@@ -386,7 +413,7 @@ sub _get_multiple_record_strings {
         }
     }
 
-    @record_strings = map { $_->string."\n" } @containing_records;
+    @record_strings = map { $_->string . "\n" } @containing_records;
     return \@record_strings;
 }
 
@@ -399,10 +426,11 @@ sub _get_master_record_strings {
     my @containing_records = ();
     for my $type ( 'TXT', 'SPF' ) {
         for my $domain (@$domains) {
-            my $name = $self->_normalize_record_name($domain);
+            #my $name = $self->_normalize_record_name($domain);
             push @containing_records, new Net::DNS::RR(
                 type    => $type,
-                name    => $name,
+                #name    => $name,
+                name    => $domain,
                 class   => $self->record_class,
                 ttl     => $self->ttl,
                 txtdata => 'v=spf1 '
@@ -414,7 +442,7 @@ sub _get_master_record_strings {
             );
         }
     }
-    @record_strings = map { $_->string."\n" } @containing_records;
+    @record_strings = map { $self->_normalize_record_name($_->string) . "\n" } @containing_records;
     return \@record_strings;
 }
 
@@ -424,61 +452,70 @@ sub _new_records_lines {
     my @record_strings = ();
 
     # Make a list of the unique records in case we need it.
-    my %autosplit_config = ();
-    my @autosplit        = ();
+    my @autosplit = ();
     for my $domain ( keys %new_records ) {
         for my $record_set ( @{ $new_records{$domain} } ) {
-            for my $record (@$record_set) {
-                push @autosplit, $record->txtdata;
+            if (ref($record_set) eq 'ARRAY') {
+                for my $record (@$record_set) {
+                    push @autosplit, $record->txtdata;
+                }
+            } else {
+                push @autosplit, $record_set->txtdata;
             }
         }
     }
     @autosplit = uniq @autosplit;
 
     # If there are any autosplit SPF records, we just do that right away.
-    if ( any { scalar( @{ $new_records{$_} } || [] ) > 1 } keys %new_records ) {
+    # This test is kind of nasty.
+    my $make_autosplit_records = grep {
+        defined( ${ $new_records{$_} }[0] )
+          && ref( ${ $new_records{$_} }[0] ) eq 'ARRAY'
+    } keys %new_records;
+    if ($make_autosplit_records) {
+        warn "I am making autosplit records";
         my $master_record_strings =
           $self->_get_master_record_strings( \@autosplit,
             [ keys %new_records ] );
         my $record_strings = $self->_get_multiple_record_strings( \@autosplit );
         push @record_strings, @$master_record_strings;
         push @record_strings, @$record_strings;
-    }
-    else {
+    } else {
+        warn "I am NOT making autosplit records";
         for my $domain ( keys %new_records ) {
             my $record_string =
               $self->_get_single_record_string( $domain,
                 $new_records{$domain} );
-            push @record_strings, $record_string;
+            warn "Record string: ", p $record_string;
+            push @record_strings, @$record_string;
         }
     }
-    my @original_lines = $self->input_file->slurp; 
-    my @new_lines = ();
+    my @original_lines = $self->input_file->slurp;
+    my @new_lines      = ();
     my @spf_indices;
     my $i = 0;
-    LINE: for my $line (@original_lines) {
-        if ($line =~ /^[^;].+?v=spf1/) {
+  LINE: for my $line (@original_lines) {
+        if ( $line =~ /^[^;].+?v=spf1/ ) {
             push @spf_indices, $i;
-            $line = ";".$line;
+            $line = ";" . $line;
         }
-        push @new_lines, $line; 
+        push @new_lines, $line;
         $i++;
     }
-    my @first_segment = @new_lines[0 .. $spf_indices[-1]];
-    my @last_segment = @new_lines[$spf_indices[-1]+1 .. $#new_lines];
-    my @final_lines = (@first_segment, @record_strings, @last_segment);
+    my @first_segment = @new_lines[ 0 .. $spf_indices[-1] ];
+    my @last_segment  = @new_lines[ $spf_indices[-1] + 1 .. $#new_lines ];
+    my @final_lines   = ( @first_segment, @record_strings, @last_segment );
 
     return \@final_lines;
 }
 
 sub write {
-    my $self = shift;
+    my $self  = shift;
     my $lines = $self->_new_records_lines;
-    #warn p $lines;
-    my $path = $self->input_file->filepath;
-    my $name = $self->input_file->filename;
-    io("${path}${name}.bak")->print($self->input_file->all);
-    io("${path}${name}")->print(@$lines);
+    my $path  = $self->input_file->filepath;
+    my $name  = $self->input_file->filename;
+    io( $self->backup_file )->print( $self->input_file->all );
+    io( $self->output_file )->print(@$lines);
     return 1;
 }
 
