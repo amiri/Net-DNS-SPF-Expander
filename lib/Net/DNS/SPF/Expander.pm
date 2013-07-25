@@ -8,6 +8,8 @@ use MooseX::Types::IO::All 'IO_All';
 use List::AllUtils qw(sum any part first uniq);
 use Scalar::Util ();
 
+with 'MooseX::Getopt';
+
 # ABSTRACT: Expands DNS SPF records, so you don't have to.
 # The problem is that you only get 10 per SPF records,
 # and recursions count against you. Your record won't
@@ -15,9 +17,14 @@ use Scalar::Util ();
 
 has 'input_file' => (
     is       => 'ro',
-    isa      => IO_All,
+    isa      => 'Str',
     required => 1,
+);
+has '_input_file' => (
+    is       => 'ro',
+    isa      => IO_All,
     coerce   => 1,
+    lazy_build => 1,
 );
 has 'output_file' => (
     is         => 'ro',
@@ -30,24 +37,23 @@ has 'backup_file' => (
     isa        => IO_All,
     lazy_build => 1,
     coerce     => 1,
-
 );
 has 'parsed_file' => (
     is         => 'ro',
     isa        => 'Net::DNS::ZoneFile',
     lazy_build => 1,
 );
-has 'resource_records' => (
+has '_resource_records' => (
     is         => 'ro',
     isa        => 'Maybe[ArrayRef[Net::DNS::RR]]',
     lazy_build => 1,
 );
-has 'spf_records' => (
+has '_spf_records' => (
     is         => 'ro',
     isa        => 'Maybe[ArrayRef[Net::DNS::RR]]',
     lazy_build => 1,
 );
-has 'resolver' => (
+has '_resolver' => (
     is         => 'ro',
     isa        => 'Net::DNS::Resolver',
     lazy_build => 1,
@@ -77,13 +83,13 @@ has 'to_ignore' => (
     },
 );
 
-has 'expansions' => (
+has '_expansions' => (
     is         => 'ro',
     isa        => 'HashRef',
     lazy_build => 1,
 );
 
-has 'lengths_of_expansions' => (
+has '_lengths_of_expansions' => (
     is         => 'ro',
     isa        => 'HashRef',
     lazy_build => 1,
@@ -105,7 +111,7 @@ has 'ttl' => (
     },
 );
 
-has 'record_class' => (
+has '_record_class' => (
     is      => 'ro',
     isa     => 'Str',
     default => sub {
@@ -119,7 +125,7 @@ has 'origin' => (
     lazy_build => 1,
 );
 
-sub _build_resolver {
+sub _build__resolver {
     my $self = shift;
     return Net::DNS::Resolver->new( recurse => 1, );
 }
@@ -129,52 +135,57 @@ sub _build_origin {
     return $self->parsed_file->origin;
 }
 
-sub _build_expansions {
+sub _build__expansions {
     my $self = shift;
     return $self->_expand;
 }
 
 sub _build_backup_file {
     my $self = shift;
-    my $path = $self->input_file->filepath;
-    my $name = $self->input_file->filename;
+    my $path = $self->_input_file->filepath;
+    my $name = $self->_input_file->filename;
     return "${path}${name}.bak";
 
 }
 
+sub _build__input_file {
+    my $self = shift;
+    return to_IO_All($self->input_file);
+}
+
 sub _build_output_file {
     my $self = shift;
-    my $path = $self->input_file->filepath;
-    my $name = $self->input_file->filename;
+    my $path = $self->_input_file->filepath;
+    my $name = $self->_input_file->filename;
     return "${path}${name}.new";
 }
 
 sub _build_parsed_file {
     my $self = shift;
-    my $path = $self->input_file->filepath;
-    my $name = $self->input_file->filename;
+    my $path = $self->_input_file->filepath;
+    my $name = $self->_input_file->filename;
     return Net::DNS::ZoneFile->new("${path}${name}");
 }
 
-sub _build_resource_records {
+sub _build__resource_records {
     my $self             = shift;
     my @resource_records = $self->parsed_file->read;
     return \@resource_records;
 }
 
-sub _build_spf_records {
+sub _build__spf_records {
     my $self = shift;
 
     # This is crude but correct: SPF records can be both TXT and SPF.
     my @spf_records =
       grep { $_->txtdata =~ /v=spf1/ }
-      grep { $_->can('txtdata') } @{ $self->resource_records };
+      grep { $_->can('txtdata') } @{ $self->_resource_records };
     return \@spf_records;
 }
 
-sub _build_lengths_of_expansions {
+sub _build__lengths_of_expansions {
     my $self              = shift;
-    my $expansions        = $self->expansions;
+    my $expansions        = $self->_expansions;
     my $length_per_domain = {};
     for my $domain ( keys %$expansions ) {
         my $record_string = join( ' ', @{ $expansions->{$domain}{elements} } );
@@ -193,7 +204,7 @@ sub _normalize_component {
 sub _perform_expansion {
     my ( $self, $component ) = @_;
     $component = $self->_normalize_component($component);
-    my $packet = $self->resolver->search( $component, 'TXT', 'IN' );
+    my $packet = $self->_resolver->search( $component, 'TXT', 'IN' );
     return unless ($packet) && $packet->isa('Net::DNS::Packet');
     my ($answer) = $packet->answer;
     return unless ($answer) && $answer->isa('Net::DNS::RR::TXT');
@@ -235,7 +246,7 @@ sub _expand_spf_component {
 sub _expand {
     my $self     = shift;
     my %spf_hash = ();
-    for my $spf_record ( @{ $self->spf_records } ) {
+    for my $spf_record ( @{ $self->_spf_records } ) {
         my @spf_components = split( ' ', $spf_record->txtdata );
         for my $spf_component (@spf_components) {
             my ( $comp, $expansions ) =
@@ -270,8 +281,8 @@ sub _extract_expansion_elements {
 
 sub new_spf_records {
     my $self       = shift;
-    my $lengths    = $self->lengths_of_expansions;
-    my $expansions = $self->expansions;
+    my $lengths    = $self->_lengths_of_expansions;
+    my $expansions = $self->_expansions;
 
     my %new_spf_records = ();
 
@@ -303,7 +314,7 @@ sub new_records_from_arrayref {
         push @new_records, new Net::DNS::RR(
             type    => $type,
             name    => $domain,
-            class   => $self->record_class,
+            class   => $self->_record_class,
             ttl     => $self->ttl,
             txtdata => join( ' ', @$expansions ),
         );
@@ -410,7 +421,7 @@ sub _get_multiple_record_strings {
             push @containing_records, new Net::DNS::RR(
                 type    => $type,
                 name    => "_spf$i.$origin",
-                class   => $self->record_class,
+                class   => $self->_record_class,
                 ttl     => $self->ttl,
                 txtdata => $value,
             );
@@ -438,7 +449,7 @@ sub _get_master_record_strings {
 
                 #name    => $name,
                 name    => $domain,
-                class   => $self->record_class,
+                class   => $self->_record_class,
                 ttl     => $self->ttl,
                 txtdata => 'v=spf1 '
                   . (
@@ -498,7 +509,7 @@ sub _new_records_lines {
             push @record_strings, @$record_string;
         }
     }
-    my @original_lines = $self->input_file->slurp;
+    my @original_lines = $self->_input_file->slurp;
     my @new_lines      = ();
     my @spf_indices;
     my $i = 0;
@@ -520,11 +531,14 @@ sub _new_records_lines {
 sub write {
     my $self  = shift;
     my $lines = $self->_new_records_lines;
-    my $path  = $self->input_file->filepath;
-    my $name  = $self->input_file->filename;
-    io( $self->backup_file )->print( $self->input_file->all );
+    my $path  = $self->_input_file->filepath;
+    my $name  = $self->_input_file->filename;
+    io( $self->backup_file )->print( $self->_input_file->all );
     io( $self->output_file )->print(@$lines);
     return 1;
 }
+
+__PACKAGE__->meta->make_immutable;
+__PACKAGE__->new_with_options->run unless caller;
 
 1;

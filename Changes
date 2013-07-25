@@ -2,5 +2,9 @@ Revision history for {{$dist->name}}
 
 {{$NEXT}}
 
-0.001   2013-07-24
+0.002   2013-07-25
+    - Make module get opts, and
+    - add script
+
+0.001   2013-07-25
     - Initial release. Hello world!
