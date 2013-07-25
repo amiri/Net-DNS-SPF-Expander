@@ -7,7 +7,11 @@ use Net::DNS::Resolver;
 use MooseX::Types::IO::All 'IO_All';
 use List::AllUtils qw(sum any part first uniq);
 use Scalar::Util ();
-use Data::Printer;
+
+# ABSTRACT: Expands DNS SPF records, so you don't have to.
+# The problem is that you only get 10 per SPF records,
+# and recursions count against you. Your record won't
+# validate.
 
 has 'input_file' => (
     is       => 'ro',
@@ -349,30 +353,30 @@ sub new_records_from_partition {
 
 sub _get_single_record_string {
     my ( $self, $domain, $record_set ) = @_;
-    my $origin         = $self->origin;
+    my $origin = $self->origin;
+
     #my $name           = $self->_normalize_record_name($domain);
     my @record_strings = ();
-    warn p $record_set;
 
     for my $record (@$record_set) {
+
         #$record->name($name);
         $record->name($domain);
-        $record->txtdata('v=spf1 ' . $record->txtdata . ' ~all');
+        $record->txtdata( 'v=spf1 ' . $record->txtdata . ' ~all' );
+
         #. "\n";
-        push @record_strings, $self->_normalize_record_name($record->string)."\n";
+        push @record_strings,
+          $self->_normalize_record_name( $record->string ) . "\n";
     }
     return \@record_strings;
 }
 
 sub _normalize_record_name {
-    my ( $self, $record) = @_;
+    my ( $self, $record ) = @_;
 
     $record =~ /(.+?)\s/;
-    warn "My record is $record"; 
     my $original_name = $1;
-    warn "My original name is $original_name";
-    my $origin = $self->origin;
-    warn "My origin is $origin";
+    my $origin        = $self->origin;
 
     my $name;
 
@@ -388,8 +392,7 @@ sub _normalize_record_name {
     else {
         $name = $original_name;
     }
-    warn "My new name is $name";
-    $record =~ s/\Q$original_name\E/\Q$name\E/g;
+    $record =~ s/\Q$original_name\E/$name/g;
     return $record;
 }
 
@@ -428,9 +431,11 @@ sub _get_master_record_strings {
     my @containing_records = ();
     for my $type ( 'TXT', 'SPF' ) {
         for my $domain (@$domains) {
+
             #my $name = $self->_normalize_record_name($domain);
             push @containing_records, new Net::DNS::RR(
-                type    => $type,
+                type => $type,
+
                 #name    => $name,
                 name    => $domain,
                 class   => $self->record_class,
@@ -444,7 +449,9 @@ sub _get_master_record_strings {
             );
         }
     }
-    @record_strings = map { $self->_normalize_record_name($_->string) . "\n" } @containing_records;
+    @record_strings =
+      map { $self->_normalize_record_name( $_->string ) . "\n" }
+      @containing_records;
     return \@record_strings;
 }
 
@@ -457,11 +464,12 @@ sub _new_records_lines {
     my @autosplit = ();
     for my $domain ( keys %new_records ) {
         for my $record_set ( @{ $new_records{$domain} } ) {
-            if (ref($record_set) eq 'ARRAY') {
+            if ( ref($record_set) eq 'ARRAY' ) {
                 for my $record (@$record_set) {
                     push @autosplit, $record->txtdata;
                 }
-            } else {
+            }
+            else {
                 push @autosplit, $record_set->txtdata;
             }
         }
@@ -475,20 +483,18 @@ sub _new_records_lines {
           && ref( ${ $new_records{$_} }[0] ) eq 'ARRAY'
     } keys %new_records;
     if ($make_autosplit_records) {
-        warn "I am making autosplit records";
         my $master_record_strings =
           $self->_get_master_record_strings( \@autosplit,
             [ keys %new_records ] );
         my $record_strings = $self->_get_multiple_record_strings( \@autosplit );
         push @record_strings, @$master_record_strings;
         push @record_strings, @$record_strings;
-    } else {
-        warn "I am NOT making autosplit records";
+    }
+    else {
         for my $domain ( keys %new_records ) {
             my $record_string =
               $self->_get_single_record_string( $domain,
                 $new_records{$domain} );
-            warn "Record string: ", p $record_string;
             push @record_strings, @$record_string;
         }
     }
