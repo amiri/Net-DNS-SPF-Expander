@@ -2,6 +2,9 @@ Revision history for {{$dist->name}}
 
 {{$NEXT}}
 
+0.003   2013-07-25
+    - Make script be found and installed. 
+
 0.002   2013-07-25
     - Make module get opts, and
     - add script
