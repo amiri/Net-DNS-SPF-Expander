@@ -376,7 +376,7 @@ sub _normalize_record_name {
 
     my $name;
 
-    if ( $original_name eq $origin ) {
+    if ( $original_name =~ /^$origin(.?)$/ ) {
         $name = '@';
     }
     elsif ( $original_name =~ /^\.$/ ) {
@@ -388,7 +388,9 @@ sub _normalize_record_name {
     else {
         $name = $original_name;
     }
-    return $name;
+    warn "My new name is $name";
+    $record =~ s/\Q$original_name\E/\Q$name\E/g;
+    return $record;
 }
 
 sub _get_multiple_record_strings {
