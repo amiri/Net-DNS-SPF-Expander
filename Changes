@@ -1,6 +1,7 @@
 Revision history for {{$dist->name}}
 
 {{$NEXT}}
+    - Add documentation.
 
 0.004   2013-07-26
     - Add documentation.
