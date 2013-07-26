@@ -92,8 +92,6 @@ Using the module:
         1;
     }
 
-=head1 METHODS
-
 =head1 CONFIGURABLE ATTRIBUTES
 
 =head2 input_file
@@ -210,7 +208,7 @@ has 'maximum_record_length' => (
     },
 );
 
-=head ttl
+=head2 ttl
 
 Default time to live is 10 minutes. Configurable.
 
