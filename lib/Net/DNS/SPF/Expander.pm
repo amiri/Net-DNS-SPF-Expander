@@ -801,10 +801,10 @@ sub _normalize_record_name {
 =head2 _get_multiple_record_strings
 
 Whereas a single new SPF record needs to be concatenated from
-the stringified L<Net::DNS::RR::TXT>s, and have the protocol and trailing
+the stringified L<Net::DNS::RR::TXT>s, and have the trailing
 ~all added, multiple new SPF records do not need that. They need to be given
 special _spf names that will then be included in "master" SPF records, and
-they need neither the protocol string nor the suffix.
+they don't need the trailing ~all.
 
 =cut
 
@@ -824,7 +824,7 @@ sub _get_multiple_record_strings {
                 name    => "_spf$i.$origin",
                 class   => $self->_record_class,
                 ttl     => $self->ttl,
-                txtdata => $value,
+                txtdata => 'v=spf1 '.$value,
             );
             $i++;
         }
