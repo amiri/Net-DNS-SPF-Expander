@@ -87,7 +87,7 @@ Using the module:
             input_file => $input_file
         );
 
-        my $success = $expander->write;
+        my $string = $expander->write;
 
         1;
     }
@@ -492,6 +492,8 @@ sub _build__lengths_of_expansions {
 This is the only method you really need to call. This expands all your SPF
 records and writes out the new and the backup files.
 
+Returns a scalar string of the data written to the file.
+
 =cut
 
 sub write {
@@ -501,7 +503,7 @@ sub write {
     my $name  = $self->_input_file->filename;
     io( $self->backup_file )->print( $self->_input_file->all );
     io( $self->output_file )->print(@$lines);
-    return 1;
+    return join('',@$lines);
 }
 
 =head2 new_spf_records

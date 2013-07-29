@@ -28,7 +28,8 @@ lives_ok {
 }
 "I can make a new expander";
 
-lives_ok { $expander->write } "I can call write on my expander";
+my $string;
+lives_ok { $string = $expander->write } "I can call write on my expander";
 
 my $expected_file_content = <<EOM;
 \$ORIGIN test_zone.com.
@@ -49,11 +50,4 @@ EOM
 
 ok( -e $_, "File $_ was created" ) for @output_files;
 
-my $content = io($new_file);
-my $new_file_content = $content->all;
-
-TODO: {
-    local $TODO = "Race condition: look at $new_file directly";
-    ok( $new_file_content eq $expected_file_content, "My new file contains what I expected" );
-
-};
+ok( $string eq $expected_file_content, "My new file contains what I expected" );

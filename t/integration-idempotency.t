@@ -9,8 +9,8 @@ use Data::Printer;
 use Test::More tests => 7;
 use Test::Exception;
 
-my $backup_file  = 't/etc/test_zonefile.bak';
-my $new_file     = 't/etc/test_zonefile.new';
+my $backup_file  = 't/etc/test_zonefile_idem.bak';
+my $new_file     = 't/etc/test_zonefile_idem.new';
 my @output_files = ( $backup_file, $new_file );
 for my $deletion (@output_files) {
     if ( -e $deletion ) {
@@ -20,7 +20,7 @@ for my $deletion (@output_files) {
     }
 }
 
-my $file_to_expand = 't/etc/test_zonefile';
+my $file_to_expand = 't/etc/test_zonefile_idem';
 
 my $expander;
 lives_ok {
@@ -54,4 +54,5 @@ EOM
 
 ok( -e $_, "File $_ was created" ) for @output_files;
 
+diag $string;
 ok( $string eq $expected_file_content, "My new file contains what I expected" );
