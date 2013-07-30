@@ -170,7 +170,7 @@ we will copy ip4, ip6, ptr, and exists records. Configurable.
 =cut
 
 has 'to_copy' => (
-    is      => 'ro',
+    is      => 'rw',
     isa     => 'ArrayRef[RegexpRef]',
     default => sub {
         [ qr/v=spf1/, qr/^ip4/, qr/^ip6/, qr/^ptr/, qr/^exists/, ];
@@ -503,7 +503,7 @@ sub write {
     my $name  = $self->_input_file->filename;
     io( $self->backup_file )->print( $self->_input_file->all );
     io( $self->output_file )->print(@$lines);
-    return join('',@$lines);
+    return join( '', @$lines );
 }
 
 =head2 new_spf_records
@@ -627,19 +627,33 @@ Create the _expansions hashref from which we generate new SPF records.
 =cut
 
 sub _expand {
-    my $self     = shift;
-    my %spf_hash = ();
+    my $self           = shift;
+    my %spf_hash       = ();
+    my %keys_to_delete = ();
     for my $spf_record ( @{ $self->_spf_records } ) {
         my @spf_components = split( ' ', $spf_record->txtdata );
         for my $spf_component (@spf_components) {
-            my ( $comp, $expansions ) =
-              $self->_expand_spf_component($spf_component);
-            $spf_hash{ $spf_record->name }{$spf_component} = $expansions;
+            my $component_name = $self->_normalize_component($spf_component);
+            if ( any { $component_name eq $_->name } @{ $self->_spf_records } )
+            {
+                my ($zonefile_record) =
+                  grep { $component_name eq $_->name } @{ $self->_spf_records };
+                my ( $comp, $expansions ) =
+                  $self->_expand_spf_component( $zonefile_record->txtdata );
+                $spf_hash{ $spf_record->name }{$spf_component} = $expansions;
+                $keys_to_delete{$component_name} = 1;
+            }
+            else {
+                my ( $comp, $expansions ) =
+                  $self->_expand_spf_component($spf_component);
+                $spf_hash{ $spf_record->name }{$spf_component} = $expansions;
+            }
         }
         my $expansion_elements =
           $self->_extract_expansion_elements( $spf_hash{ $spf_record->name } );
         $spf_hash{ $spf_record->name }{elements} = $expansion_elements;
     }
+    delete @spf_hash{ keys %keys_to_delete };
     return \%spf_hash;
 }
 
@@ -664,7 +678,7 @@ sub _extract_expansion_elements {
             }
         }
     }
-    my @return = ( @leading, @elements, @trailing );
+    my @return = uniq( @leading, @elements, @trailing );
     return \@return;
 }
 
@@ -728,10 +742,31 @@ sub _new_records_from_partition {
     my $partition_offset = 0;
 
     for my $part ( 1 .. $number_of_partitions ) {
-        my $split_point =
-          first { $_ < $max_length * $part } reverse @space_indices;
-        my $substring =
-          substr( $record_string, $partition_offset, $split_point );
+
+        # We want the first space_index that is
+        #   1. less than the max_length times the number of parts, and
+        #   2. subtracting the partition_offset from it is less than
+        #      max_length.
+        my $split_point = first {
+            ( $_ < ( $max_length * $part ) )
+              &&
+            ( ( $_ - $partition_offset ) < $max_length );
+        } reverse @space_indices;
+
+        my $partition_length = $split_point - $partition_offset;
+        # Go to the end of the string if we are dealing with
+        # the last partition. Otherwise, the last element
+        # gets chopped off, because it is after the last space_index!
+        my $length = ($part == $number_of_partitions) ? undef : $partition_length;
+        my $substring;
+        if ($part == $number_of_partitions) {
+            # Go to the end.
+            $substring = substr( $record_string, $partition_offset);
+        } else {
+            # Take a specific length.
+            $substring = substr( $record_string, $partition_offset, $partition_length);
+        }
+
         push @partitions, [ split( ' ', $substring ) ];
         $partition_offset = $split_point;
     }
@@ -826,7 +861,7 @@ sub _get_multiple_record_strings {
                 name    => "_spf$i.$origin",
                 class   => $self->_record_class,
                 ttl     => $self->ttl,
-                txtdata => 'v=spf1 '.$value,
+                txtdata => 'v=spf1 ' . $value,
             );
             $i++;
         }
