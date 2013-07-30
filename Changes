@@ -12,7 +12,7 @@ Revision history for {{$dist->name}}
       it returns the string that will be
       written out.
 
-0.005
+0.005 2013-07-28
     - Make sure that our split spf records
       contain the protocol, v=spf1.
 
