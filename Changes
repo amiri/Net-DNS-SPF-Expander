@@ -1,6 +1,7 @@
 Revision history for {{$dist->name}}
 
 {{$NEXT}}
+    - Fix Changes file. neilbowers
 
 0.006     2013-07-29
     - Make sure we can run the script on

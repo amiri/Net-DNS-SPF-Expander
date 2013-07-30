@@ -989,7 +989,11 @@ __END__
 
 =head1 AUTHOR
 
-Amiri Barksdale, E<lt>amiri@campusexplorer.comE<gt>
+Amiri Barksdale E<lt>amiri@campusexplorer.comE<gt>
+
+=head2 CONTRIBUTORS
+
+Neil Bowers E<lt>neil@bowers.comE<gt>
 
 =head1 COPYRIGHT
 
