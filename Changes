@@ -1,6 +1,8 @@
 Revision history for {{$dist->name}}
 
 {{$NEXT}}
+
+0.008     2013-07-30
     - Remove IO_All filetype on output_file.
 
 0.007     2013-07-30
