@@ -1,6 +1,9 @@
 Revision history for {{$dist->name}}
 
 {{$NEXT}}
+    - Remove IO_All filetype on output_file.
+
+0.007     2013-07-30
     - Fix Changes file. neilbowers
 
 0.006     2013-07-29

@@ -116,9 +116,8 @@ onto the end of the original filename.
 
 has 'output_file' => (
     is         => 'ro',
-    isa        => IO_All,
+    isa        => 'Str',
     lazy_build => 1,
-    coerce     => 1,
 );
 
 =head2 backup_file 
