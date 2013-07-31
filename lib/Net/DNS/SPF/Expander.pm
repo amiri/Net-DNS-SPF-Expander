@@ -7,6 +7,7 @@ use Net::DNS::Resolver;
 use MooseX::Types::IO::All 'IO_All';
 use List::AllUtils qw(sum any part first uniq);
 use Scalar::Util ();
+use v5.10.1;
 
 with 'MooseX::Getopt';
 
@@ -584,6 +585,7 @@ full SPF record string from L<Net::DNS::RR::TXT>->txtdata.
 sub _perform_expansion {
     my ( $self, $component ) = @_;
     $component = $self->_normalize_component($component);
+    warn "I am doing a lookup for $component";
     my $packet = $self->_resolver->search( $component, 'TXT', 'IN' );
     return unless ($packet) && $packet->isa('Net::DNS::Packet');
     my ($answer) = $packet->answer;
@@ -654,8 +656,10 @@ sub _expand {
             my $component_name = $self->_normalize_component($spf_component);
             if ( any { $component_name eq $_->name } @{ $self->_spf_records } )
             {
+                warn "I am treating $component_name as already defined in this zonefile";
                 my ($zonefile_record) =
                   grep { $component_name eq $_->name } @{ $self->_spf_records };
+                warn "The txtdata that will be expanded is ", $zonefile_record->txtdata;
                 my ( $comp, $expansions ) =
                   $self->_expand_spf_component( $zonefile_record->txtdata );
                 $spf_hash{ $spf_record->name }{$spf_component} = $expansions;
@@ -672,6 +676,8 @@ sub _expand {
         $spf_hash{ $spf_record->name }{elements} = $expansion_elements;
     }
     delete @spf_hash{ keys %keys_to_delete };
+    use Data::Printer;
+    warn p %spf_hash;
     return \%spf_hash;
 }
 
