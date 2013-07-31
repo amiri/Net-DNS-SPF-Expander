@@ -376,6 +376,7 @@ sub _build__resolver {
         recurse => 1,
         ($nameservers ? (nameservers => $nameservers) : ()),
     );
+    $resolver->empty_searchlist;
     use Data::Printer;
     warn p $resolver;
     return $resolver;
