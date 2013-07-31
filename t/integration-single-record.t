@@ -8,6 +8,7 @@ use Data::Printer;
 
 use Test::More tests => 7;
 use Test::Exception;
+use Test::Differences;
 
 my $backup_file  = 't/etc/test_zonefile_single.bak';
 my $new_file     = 't/etc/test_zonefile_single.new';
@@ -24,7 +25,7 @@ my $file_to_expand = 't/etc/test_zonefile_single';
 
 my $expander;
 lives_ok {
-    $expander = Net::DNS::SPF::Expander->new( input_file => $file_to_expand, nameservers => ['ns-170.awsdns-21.com'] );
+    $expander = Net::DNS::SPF::Expander->new( input_file => $file_to_expand );
 }
 "I can make a new expander";
 
@@ -50,4 +51,4 @@ EOM
 
 ok( -e $_, "File $_ was created" ) for @output_files;
 
-ok( $string eq $expected_file_content, "My new file contains what I expected" );
+eq_or_diff( $string, $expected_file_content, "My new file contains what I expected" );

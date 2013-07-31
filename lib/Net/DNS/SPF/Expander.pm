@@ -374,7 +374,7 @@ sub _build__resolver {
     my $nameservers = $self->nameservers;
     my $resolver = Net::DNS::Resolver->new(
         recurse => 1,
-        ($nameservers ? (nameservers => $nameservers, searchlist => [], ) : ()),
+        ($nameservers ? (nameservers => $nameservers) : ()),
     );
     use Data::Printer;
     warn p $resolver;

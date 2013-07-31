@@ -24,7 +24,7 @@ my $file_to_expand = 't/etc/test_zonefile_idem';
 
 my $expander;
 lives_ok {
-    $expander = Net::DNS::SPF::Expander->new( input_file => $file_to_expand, nameservers => ['ns-170.awsdns-21.com'] );
+    $expander = Net::DNS::SPF::Expander->new( input_file => $file_to_expand );
 }
 "I can make a new expander";
 
