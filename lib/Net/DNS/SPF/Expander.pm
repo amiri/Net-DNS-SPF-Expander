@@ -134,6 +134,17 @@ has 'backup_file' => (
     coerce     => 1,
 );
 
+=head2 nameservers
+
+A list of nameservers that will be passed to the resolver.
+
+=cut
+
+has 'nameservers' => (
+    is      => 'ro',
+    isa     => 'Maybe[ArrayRef]',
+);
+
 =head2 parsed_file
 
 The L<Net::DNS::Zonefile> object created from the input_file.
@@ -360,7 +371,14 @@ Return a L<Net::DNS::Resolver>.
 
 sub _build__resolver {
     my $self = shift;
-    return Net::DNS::Resolver->new( recurse => 1, );
+    my $nameservers = $self->nameservers;
+    my $resolver = Net::DNS::Resolver->new(
+        recurse => 1,
+        ($nameservers ? (nameservers => $nameservers, searchlist => [], ) : ()),
+    );
+    use Data::Printer;
+    warn p $resolver;
+    return $resolver;
 }
 
 =head2 _build_origin
