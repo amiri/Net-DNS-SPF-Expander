@@ -1,6 +1,10 @@
 Revision history for {{$dist->name}}
 
 {{$NEXT}}
+    - Fix tests for 5.18 by making sure expansions
+      are sorted, and making sure we don't clobber
+      @_ with an implicit split to @_ in
+      _expand_spf_component. 
 
 0.008     2013-07-30
     - Remove IO_All filetype on output_file.
