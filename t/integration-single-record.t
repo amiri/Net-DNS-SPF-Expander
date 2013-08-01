@@ -17,7 +17,7 @@ for my $deletion (@output_files) {
     if ( -e $deletion ) {
         lives_ok { unlink $deletion } "I am deleting $deletion";
     } else {
-        ok(1==1, "$deletion was already deleted");
+        ok( 1 == 1, "$deletion was already deleted" );
     }
 }
 
@@ -25,9 +25,12 @@ my $file_to_expand = 't/etc/test_zonefile_single';
 
 my $expander;
 lives_ok {
-    $expander = Net::DNS::SPF::Expander->new( input_file => $file_to_expand,
-    #nameservers => ['ns-170.awsdns-21.com', 'ns-1953.awsdns-52.co.uk', 'ns-861.awsdns-43.net', 'ns-1117.awsdns-11.org',]);
-    nameservers => ['8.8.8.8', '8.8.4.4',]);
+    $expander = Net::DNS::SPF::Expander->new(
+        input_file => $file_to_expand,
+
+#nameservers => ['ns-170.awsdns-21.com', 'ns-1953.awsdns-52.co.uk', 'ns-861.awsdns-43.net', 'ns-1117.awsdns-11.org',]);
+#nameservers => ['8.8.8.8', '8.8.4.4',]
+    );
 }
 "I can make a new expander";
 
@@ -42,10 +45,10 @@ mama    CNAME   222.333.444.5.
 
 ;@               SPF     "v=spf1 include:sendgrid.biz ~all"
 ;*               TXT     "v=spf1 include:sendgrid.biz ~all"
-@	600	IN	TXT	"v=spf1 ip4:208.115.235.0/24 ip4:74.63.231.0/24 ip4:74.63.247.0/24 ip4:74.63.236.0/24 ip4:208.115.239.0/24 ip4:173.193.132.0/24 ip4:173.193.133.0/24 ip4:208.117.48.0/20 ip4:50.31.32.0/19 ip4:198.37.144.0/20 ip4:198.21.0.0/21 ip4:192.254.112.0/20 ~all"
-@	600	IN	SPF	"v=spf1 ip4:208.115.235.0/24 ip4:74.63.231.0/24 ip4:74.63.247.0/24 ip4:74.63.236.0/24 ip4:208.115.239.0/24 ip4:173.193.132.0/24 ip4:173.193.133.0/24 ip4:208.117.48.0/20 ip4:50.31.32.0/19 ip4:198.37.144.0/20 ip4:198.21.0.0/21 ip4:192.254.112.0/20 ~all"
 *	600	IN	TXT	"v=spf1 ip4:208.115.235.0/24 ip4:74.63.231.0/24 ip4:74.63.247.0/24 ip4:74.63.236.0/24 ip4:208.115.239.0/24 ip4:173.193.132.0/24 ip4:173.193.133.0/24 ip4:208.117.48.0/20 ip4:50.31.32.0/19 ip4:198.37.144.0/20 ip4:198.21.0.0/21 ip4:192.254.112.0/20 ~all"
 *	600	IN	SPF	"v=spf1 ip4:208.115.235.0/24 ip4:74.63.231.0/24 ip4:74.63.247.0/24 ip4:74.63.236.0/24 ip4:208.115.239.0/24 ip4:173.193.132.0/24 ip4:173.193.133.0/24 ip4:208.117.48.0/20 ip4:50.31.32.0/19 ip4:198.37.144.0/20 ip4:198.21.0.0/21 ip4:192.254.112.0/20 ~all"
+@	600	IN	TXT	"v=spf1 ip4:208.115.235.0/24 ip4:74.63.231.0/24 ip4:74.63.247.0/24 ip4:74.63.236.0/24 ip4:208.115.239.0/24 ip4:173.193.132.0/24 ip4:173.193.133.0/24 ip4:208.117.48.0/20 ip4:50.31.32.0/19 ip4:198.37.144.0/20 ip4:198.21.0.0/21 ip4:192.254.112.0/20 ~all"
+@	600	IN	SPF	"v=spf1 ip4:208.115.235.0/24 ip4:74.63.231.0/24 ip4:74.63.247.0/24 ip4:74.63.236.0/24 ip4:208.115.239.0/24 ip4:173.193.132.0/24 ip4:173.193.133.0/24 ip4:208.117.48.0/20 ip4:50.31.32.0/19 ip4:198.37.144.0/20 ip4:198.21.0.0/21 ip4:192.254.112.0/20 ~all"
 
 greasy  CNAME   333.444.555.6.
 granny  CNAME   666.777.888.9.
@@ -53,4 +56,5 @@ EOM
 
 ok( -e $_, "File $_ was created" ) for @output_files;
 
-eq_or_diff( $string, $expected_file_content, "My new file contains what I expected" );
+eq_or_diff( $string, $expected_file_content,
+    "My new file contains what I expected" );
