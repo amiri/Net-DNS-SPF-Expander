@@ -4,7 +4,6 @@ use lib 'lib';
 
 use Net::DNS::SPF::Expander;
 use IO::All -utf8;
-use Data::Printer;
 
 use Test::More tests => 7;
 use Test::Exception;
@@ -25,12 +24,8 @@ my $file_to_expand = 't/etc/test_zonefile_idem';
 
 my $expander;
 lives_ok {
-    $expander = Net::DNS::SPF::Expander->new(
-        input_file => $file_to_expand,
-
-#nameservers => ['ns-170.awsdns-21.com', 'ns-1953.awsdns-52.co.uk', 'ns-861.awsdns-43.net', 'ns-1117.awsdns-11.org',]);
-#nameservers => ['8.8.8.8', '8.8.4.4',]
-    );
+    $expander
+        = Net::DNS::SPF::Expander->new( input_file => $file_to_expand, );
 }
 "I can make a new expander";
 
@@ -82,6 +77,9 @@ EOM
 
 ok( -e $_, "File $_ was created" ) for @output_files;
 
-diag $string;
-eq_or_diff( $string, $expected_file_content,
-    "My new file contains what I expected" );
+if ($string ne $expected_file_content) {
+    diag "Expected: \n$expected_file_content";
+    diag "Got: \n$string";
+}
+ok( $string eq $expected_file_content,
+    "The text of the new file is what I expected" );

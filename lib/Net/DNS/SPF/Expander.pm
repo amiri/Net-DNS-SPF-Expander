@@ -7,7 +7,6 @@ use Net::DNS::Resolver;
 use MooseX::Types::IO::All 'IO_All';
 use List::AllUtils qw(sum any part first uniq);
 use Scalar::Util ();
-use v5.10.1;
 
 with 'MooseX::Getopt';
 
@@ -142,8 +141,8 @@ A list of nameservers that will be passed to the resolver.
 =cut
 
 has 'nameservers' => (
-    is      => 'ro',
-    isa     => 'Maybe[ArrayRef]',
+    is  => 'ro',
+    isa => 'Maybe[ArrayRef]',
 );
 
 =head2 parsed_file
@@ -366,18 +365,18 @@ has '_record_class' => (
 
 =head2 _build_resolver
 
-Return a L<Net::DNS::Resolver>.
+Return a L<Net::DNS::Resolver>. Any nameservers will be passed
+through to the resolver.
 
 =cut
 
 sub _build__resolver {
-    my $self = shift;
+    my $self        = shift;
     my $nameservers = $self->nameservers;
-    my $resolver = Net::DNS::Resolver->new(
+    my $resolver    = Net::DNS::Resolver->new(
         recurse => 1,
-        ($nameservers ? (nameservers => $nameservers) : ()),
+        ( $nameservers ? ( nameservers => $nameservers ) : () ),
     );
-    $resolver->empty_searchlist;
     return $resolver;
 }
 
@@ -477,9 +476,10 @@ sub _build__spf_records {
     my $self = shift;
 
     # This is crude but correct: SPF records can be both TXT and SPF.
-    my @spf_records =
-      grep { $_->txtdata =~ /v=spf1/ }
-      grep { $_->can('txtdata') } @{ $self->_resource_records };
+    my @spf_records = 
+        grep { $_->txtdata =~ /v=spf1/ }
+        grep { $_->can('txtdata') }
+    @{ $self->_resource_records };
     return \@spf_records;
 }
 
@@ -496,7 +496,8 @@ sub _build__lengths_of_expansions {
     my $expansions        = $self->_expansions;
     my $length_per_domain = {};
     for my $domain ( keys %$expansions ) {
-        my $record_string = join( ' ', @{ $expansions->{$domain}{elements} } );
+        my $record_string
+            = join( ' ', @{ $expansions->{$domain}{elements} } );
         $length_per_domain->{$domain} = length($record_string);
     }
     return $length_per_domain;
@@ -526,7 +527,7 @@ sub write {
 =head2 new_spf_records
 
 In case you want to see how your records were expanded, this returns
-the hashref used to create the new records.
+the hashref of L<Net::DNS::RR> objects used to create the new records.
 
 =cut
 
@@ -543,13 +544,10 @@ sub new_spf_records {
         # We need to make sure the SPF record is less than 256 chars,
         # including the spf version and trailing ~all.
         if ( $lengths->{$domain} > $self->maximum_record_length ) {
-            $new_records =
-              $self->_new_records_from_partition( $domain,
+            $new_records = $self->_new_records_from_partition( $domain,
                 $expansions->{$domain}{elements} );
-        }
-        else {
-            $new_records =
-              $self->_new_records_from_arrayref( $domain,
+        } else {
+            $new_records = $self->_new_records_from_arrayref( $domain,
                 $expansions->{$domain}{elements} );
         }
         $new_spf_records{$domain} = $new_records;
@@ -613,24 +611,21 @@ sub _expand_spf_component {
 
     return unless $component;
 
-    if ( scalar( split( ' ', $component ) ) > 1 ) {
-        my @components = split( ' ', $component );
-        for my $component (@components) {
+    my @component_splits = split( ' ', $component );
+    my $splits = @component_splits;
+    if ( $splits > 1 ) {
+        for my $component (@component_splits) {
             $self->_expand_spf_component( $component, $expansions );
         }
-    }
-    else {
-        if ( ( any { $component =~ $_ } @{ $self->to_ignore } ) ) {
+    } else {
+        if (( any { $component =~ $_ } @{ $self->to_ignore } )) {
             return $component;
-        }
-        elsif ( ( any { $component =~ $_ } @{ $self->to_copy } ) ) {
+        } elsif (( any { $component =~ $_ } @{ $self->to_copy } )) {
             push @{$expansions}, $component;
-        }
-        elsif ( ( any { $component =~ $_ } @{ $self->to_expand } ) ) {
+        } elsif (( any { $component =~ $_ } @{ $self->to_expand } )) {
             my $new_component = $self->_perform_expansion($component);
             $self->_expand_spf_component( $new_component, $expansions );
-        }
-        else {
+        } else {
             return $component;
         }
     }
@@ -651,25 +646,33 @@ sub _expand {
         my @spf_components = split( ' ', $spf_record->txtdata );
         for my $spf_component (@spf_components) {
             my $component_name = $self->_normalize_component($spf_component);
-            if ( any { $component_name eq $_->name } @{ $self->_spf_records } )
-            {
-                my ($zonefile_record) =
-                  grep { $component_name eq $_->name } @{ $self->_spf_records };
-                my ( $comp, $expansions ) =
-                  $self->_expand_spf_component( $zonefile_record->txtdata );
+            # We want to make sure that we do not look up spf records that are
+            # defined in this zonefile. So that we could run this tool on a
+            # previously expanded zonefile if we want to. That sort of defeats
+            # the point of the tool, but you may edit the previously expanded zonefile,
+            # adding a new include: or mx, appending it to the other _spfX includes.
+            # We just take the component and its existing expansions and stick them
+            # into the component's parent as a key and value, and then we remove that
+            # component as a separate key from our hash.
+            if ( any { $component_name eq $_->name } @{ $self->_spf_records } ) {
+                my ($zonefile_record)
+                    = grep { $component_name eq $_->name }
+                    @{ $self->_spf_records };
+                my ( $comp, $expansions )
+                    = $self->_expand_spf_component(
+                    $zonefile_record->txtdata );
                 $spf_hash{ $spf_record->name }{$spf_component} = $expansions;
                 $keys_to_delete{$component_name} = 1;
-            }
-            else {
-                my ( $comp, $expansions ) =
-                  $self->_expand_spf_component($spf_component);
+            } else {
+                my ( $comp, $expansions )
+                    = $self->_expand_spf_component($spf_component);
                 $spf_hash{ $spf_record->name }{$spf_component} = $expansions;
             }
         }
-        my $expansion_elements =
-          $self->_extract_expansion_elements( $spf_hash{ $spf_record->name } );
+        my $expansion_elements = $self->_extract_expansion_elements(
+            $spf_hash{ $spf_record->name } );
         $spf_hash{ $spf_record->name }{elements} = $expansion_elements;
-    }
+    } 
     delete @spf_hash{ keys %keys_to_delete };
     return \%spf_hash;
 }
@@ -685,7 +688,7 @@ sub _extract_expansion_elements {
     my @elements = ();
     my @leading  = ();
     my @trailing = ();
-  KEY: for my $key ( keys %$expansions ) {
+KEY: for my $key ( keys %$expansions ) {
         if ( any { $key =~ $_ } @{ $self->to_ignore } ) {
             next KEY;
         }
@@ -695,7 +698,8 @@ sub _extract_expansion_elements {
             }
         }
     }
-    my @return = uniq( @leading, @elements, @trailing );
+    # We sort these so we can be sure of the order in tests.
+    my @return = uniq sort ( @leading, @elements, @trailing );
     return \@return;
 }
 
@@ -712,15 +716,17 @@ SPF record.
 sub _new_records_from_arrayref {
     my ( $self, $domain, $expansions ) = @_;
 
+
     my @new_records = ();
     for my $type ( 'TXT', 'SPF' ) {
-        push @new_records, new Net::DNS::RR(
+        push @new_records,
+            new Net::DNS::RR(
             type    => $type,
             name    => $domain,
             class   => $self->_record_class,
             ttl     => $self->ttl,
             txtdata => join( ' ', @$expansions ),
-        );
+            );
     }
     return \@new_records;
 }
@@ -751,9 +757,8 @@ sub _new_records_from_partition {
         $result = index( $record_string, ' ', $offset );
     }
 
-    my $number_of_partitions =
-      int( $record_length / $max_length ) +
-      ( ( $record_length % $max_length ) ? 1 : 0 );
+    my $number_of_partitions = int( $record_length / $max_length )
+        + ( ( $record_length % $max_length ) ? 1 : 0 );
 
     my @partitions       = ();
     my $partition_offset = 0;
@@ -766,22 +771,27 @@ sub _new_records_from_partition {
         #      max_length.
         my $split_point = first {
             ( $_ < ( $max_length * $part ) )
-              &&
-            ( ( $_ - $partition_offset ) < $max_length );
-        } reverse @space_indices;
+                && ( ( $_ - $partition_offset ) < $max_length );
+        }
+        reverse @space_indices;
 
         my $partition_length = $split_point - $partition_offset;
+
         # Go to the end of the string if we are dealing with
         # the last partition. Otherwise, the last element
         # gets chopped off, because it is after the last space_index!
-        my $length = ($part == $number_of_partitions) ? undef : $partition_length;
+        my $length
+            = ( $part == $number_of_partitions ) ? undef : $partition_length;
         my $substring;
-        if ($part == $number_of_partitions) {
+        if ( $part == $number_of_partitions ) {
+
             # Go to the end.
-            $substring = substr( $record_string, $partition_offset);
+            $substring = substr( $record_string, $partition_offset );
         } else {
+
             # Take a specific length.
-            $substring = substr( $record_string, $partition_offset, $partition_length);
+            $substring = substr( $record_string, $partition_offset,
+                $partition_length );
         }
 
         push @partitions, [ split( ' ', $substring ) ];
@@ -814,7 +824,7 @@ sub _get_single_record_string {
         $record->name($domain);
         $record->txtdata( 'v=spf1 ' . $record->txtdata . ' ~all' );
         push @record_strings,
-          $self->_normalize_record_name( $record->string ) . "\n";
+            $self->_normalize_record_name( $record->string ) . "\n";
     }
     return \@record_strings;
 }
@@ -838,14 +848,11 @@ sub _normalize_record_name {
 
     if ( $original_name =~ /^$origin(.?)$/ ) {
         $name = '@';
-    }
-    elsif ( $original_name =~ /^\.$/ ) {
+    } elsif ( $original_name =~ /^\.$/ ) {
         $name = '@';
-    }
-    elsif ( $original_name =~ /^\*/ ) {
+    } elsif ( $original_name =~ /^\*/ ) {
         $name = '*';
-    }
-    else {
+    } else {
         $name = $original_name;
     }
     $record =~ s/\Q$original_name\E/$name/g;
@@ -873,13 +880,14 @@ sub _get_multiple_record_strings {
     for my $type ( 'TXT', 'SPF' ) {
         my $i = 1;
         for my $value (@$values) {
-            push @containing_records, new Net::DNS::RR(
+            push @containing_records,
+                new Net::DNS::RR(
                 type    => $type,
                 name    => "_spf$i.$origin",
                 class   => $self->_record_class,
                 ttl     => $self->ttl,
                 txtdata => 'v=spf1 ' . $value,
-            );
+                );
             $i++;
         }
     }
@@ -907,23 +915,28 @@ sub _get_master_record_strings {
     for my $type ( 'TXT', 'SPF' ) {
         for my $domain (@$domains) {
 
-            push @containing_records, new Net::DNS::RR(
+            push @containing_records,
+                new Net::DNS::RR(
                 type    => $type,
                 name    => $domain,
                 class   => $self->_record_class,
                 ttl     => $self->ttl,
                 txtdata => 'v=spf1 '
-                  . (
+                    . (
                     join( ' ',
-                        ( map { "_spf$_.$origin" } ( 1 .. scalar(@$values) ) ) )
-                  )
-                  . ' ~all',
-            );
+                        ( map {"_spf$_.$origin"} ( 1 .. scalar(@$values) ) ) )
+                    )
+                    . ' ~all',
+                );
         }
     }
-    @record_strings =
-      map { $self->_normalize_record_name( $_->string ) . "\n" }
-      @containing_records;
+    @record_strings
+        = map { $self->_normalize_record_name( $_->string ) . "\n" }
+        # We sort first by the string, and then by the type,
+        # so that TXT goes first, before SPF.
+        sort  { $b->type cmp $a->type }
+        sort  { $a->string cmp $b->string }
+        @containing_records;
     return \@record_strings;
 }
 
@@ -948,8 +961,7 @@ sub _new_records_lines {
                 for my $record (@$record_set) {
                     push @autosplit, $record->txtdata;
                 }
-            }
-            else {
+            } else {
                 push @autosplit, $record_set->txtdata;
             }
         }
@@ -960,20 +972,19 @@ sub _new_records_lines {
     # This test is kind of nasty.
     my $make_autosplit_records = grep {
         defined( ${ $new_records{$_} }[0] )
-          && ref( ${ $new_records{$_} }[0] ) eq 'ARRAY'
+            && ref( ${ $new_records{$_} }[0] ) eq 'ARRAY'
     } keys %new_records;
     if ($make_autosplit_records) {
-        my $master_record_strings =
-          $self->_get_master_record_strings( \@autosplit,
+        my $master_record_strings
+            = $self->_get_master_record_strings( \@autosplit,
             [ keys %new_records ] );
-        my $record_strings = $self->_get_multiple_record_strings( \@autosplit );
+        my $record_strings
+            = $self->_get_multiple_record_strings( \@autosplit );
         push @record_strings, @$master_record_strings;
         push @record_strings, @$record_strings;
-    }
-    else {
+    } else {
         for my $domain ( keys %new_records ) {
-            my $record_string =
-              $self->_get_single_record_string( $domain,
+            my $record_string = $self->_get_single_record_string( $domain,
                 $new_records{$domain} );
             push @record_strings, @$record_string;
         }
@@ -982,7 +993,7 @@ sub _new_records_lines {
     my @new_lines      = ();
     my @spf_indices;
     my $i = 0;
-  LINE: for my $line (@original_lines) {
+LINE: for my $line (@original_lines) {
         if ( $line =~ /^[^;].+?v=spf1/ ) {
             push @spf_indices, $i;
             $line = ";" . $line;
