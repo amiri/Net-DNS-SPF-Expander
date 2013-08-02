@@ -1,10 +1,14 @@
 Revision history for {{$dist->name}}
 
 {{$NEXT}}
+    - Another sorting fix for single records and
+      test failures on 5.18.
+
+0.009     2013-08-01
     - Fix tests for 5.18 by making sure expansions
       are sorted, and making sure we don't clobber
       @_ with an implicit split to @_ in
-      _expand_spf_component. 
+      _expand_spf_component.
 
 0.008     2013-07-30
     - Remove IO_All filetype on output_file.
@@ -30,7 +34,7 @@ Revision history for {{$dist->name}}
     - Add documentation.
 
 0.003   2013-07-25
-    - Make script be found and installed. 
+    - Make script be found and installed.
 
 0.002   2013-07-25
     - Make module get opts, and

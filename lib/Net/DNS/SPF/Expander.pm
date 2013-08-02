@@ -827,7 +827,14 @@ sub _get_single_record_string {
 
     my @record_strings = ();
 
-    for my $record (@$record_set) {
+    my @sorted_record_set = map { $_ }
+        # We sort first by the string, and then by the type,
+        # so that TXT goes first, before SPF.
+        sort  { $b->type cmp $a->type }
+        sort  { $a->string cmp $b->string }
+    @$record_set;
+
+    for my $record (@sorted_record_set) {
         $record->name($domain);
         $record->txtdata( 'v=spf1 ' . $record->txtdata . ' ~all' );
         push @record_strings,
@@ -899,7 +906,13 @@ sub _get_multiple_record_strings {
         }
     }
 
-    @record_strings = map { $_->string . "\n" } @containing_records;
+    @record_strings = map { $self->_normalize_record_name( $_->string ) . "\n" }
+        # We sort first by the string, and then by the type,
+        # so that TXT goes first, before SPF.
+        sort  { $b->type cmp $a->type }
+        sort  { $a->string cmp $b->string }
+    @containing_records;
+
     return \@record_strings;
 }
 
@@ -942,6 +955,7 @@ sub _get_master_record_strings {
         sort  { $b->type cmp $a->type }
         sort  { $a->string cmp $b->string }
     @containing_records;
+
     return \@record_strings;
 }
 
@@ -978,7 +992,7 @@ sub _new_records_lines {
     my $make_autosplit_records = grep {
         defined( ${ $new_records{$_} }[0] )
             && ref( ${ $new_records{$_} }[0] ) eq 'ARRAY'
-    } keys %new_records;
+    } sort keys %new_records;
     if ($make_autosplit_records) {
         my $master_record_strings
             = $self->_get_master_record_strings( \@autosplit,
@@ -988,7 +1002,7 @@ sub _new_records_lines {
         push @record_strings, @$master_record_strings;
         push @record_strings, @$record_strings;
     } else {
-        for my $domain ( keys %new_records ) {
+        for my $domain ( sort keys %new_records ) {
             my $record_string = $self->_get_single_record_string(
                 $domain,
                 $new_records{$domain},
