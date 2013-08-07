@@ -437,7 +437,7 @@ Returns a scalar string of the data written to the file.
 sub write {
     my $self  = shift;
     my $lines = $self->_new_records_lines;
-    $self->backup_file->spew($self->input_file->slurp);
+    $self->backup_file->spew([ $self->input_file->slurp ]);
     $self->output_file->spew($lines);
     return join( '', @$lines );
 }
