@@ -1,10 +1,12 @@
 package Net::DNS::SPF::Expander;
 
 use Moose;
+use namespace::autoclean;
+use MooseX::AttributeShortcuts;
 use IO::All -utf8;
 use Net::DNS::ZoneFile;
 use Net::DNS::Resolver;
-use MooseX::Types::IO::All 'IO_All';
+use MooseX::Types::Path::Class ':all';
 use List::AllUtils qw(sum any part first uniq);
 use Scalar::Util ();
 
@@ -103,7 +105,8 @@ to expand. It must be a valid L<Net::DNS::Zonefile> zonefile.
 
 has 'input_file' => (
     is       => 'ro',
-    isa      => 'Str',
+    isa      => File,
+    coerce   => 1,
     required => 1,
 );
 
@@ -115,9 +118,10 @@ onto the end of the original filename.
 =cut
 
 has 'output_file' => (
-    is         => 'ro',
-    isa        => 'Str',
-    lazy_build => 1,
+    is         => 'lazy',
+    isa        => File,
+    coerce     => 1,
+    builder    => sub { shift->input_file . '.new' },
 );
 
 =head2 backup_file
@@ -128,10 +132,10 @@ onto the end of the original filename.
 =cut
 
 has 'backup_file' => (
-    is         => 'ro',
-    isa        => IO_All,
-    lazy_build => 1,
+    is         => 'lazy',
+    isa        => File,
     coerce     => 1,
+    builder    => sub { shift->input_file . '.bak' },
 );
 
 =head2 nameservers
@@ -152,9 +156,9 @@ The L<Net::DNS::Zonefile> object created from the input_file.
 =cut
 
 has 'parsed_file' => (
-    is         => 'ro',
+    is         => 'lazy',
     isa        => 'Net::DNS::ZoneFile',
-    lazy_build => 1,
+    builder    => sub { Net::DNS::ZoneFile->new(shift->input_file->stringify) },
 );
 
 =head2 to_expand
@@ -240,25 +244,12 @@ or you can set it if you like.
 =cut
 
 has 'origin' => (
-    is         => 'ro',
-    isa        => 'Str',
-    lazy_build => 1,
+    is      => 'lazy',
+    isa     => 'Str',
+    builder => sub { shift->parsed_file->origin },
 );
 
 =head1 PRIVATE ATTRIBUTES
-
-=head2 _input_file
-
-The L<IO::All> object created from the input_file.
-
-=cut
-
-has '_input_file' => (
-    is         => 'ro',
-    isa        => IO_All,
-    coerce     => 1,
-    lazy_build => 1,
-);
 
 =head2 _resource_records
 
@@ -268,9 +259,9 @@ found in the entire parsed_file.
 =cut
 
 has '_resource_records' => (
-    is         => 'ro',
+    is         => 'lazy',
     isa        => 'Maybe[ArrayRef[Net::DNS::RR]]',
-    lazy_build => 1,
+    builder    => sub { [ shift->parsed_file->read ] },
 );
 
 =head2 _spf_records
@@ -329,9 +320,9 @@ They are alpha sorted in the final results for predictability in tests.
 =cut
 
 has '_expansions' => (
-    is         => 'ro',
+    is         => 'lazy',
     isa        => 'HashRef',
-    lazy_build => 1,
+    builder => sub { shift->_expand },
 );
 
 =head2 _lengths_of_expansions
@@ -382,17 +373,6 @@ sub _build__resolver {
     return $resolver;
 }
 
-=head2 _build_origin
-
-Extract the origin from parsed_file.
-
-=cut
-
-sub _build_origin {
-    my $self = shift;
-    return $self->parsed_file->origin;
-}
-
 =head2 _build_expansions
 
 =cut
@@ -400,70 +380,6 @@ sub _build_origin {
 sub _build__expansions {
     my $self = shift;
     return $self->_expand;
-}
-
-=head2 _build_backup_file
-
-Tack a ".bak" onto the end of the input_file.
-
-=cut
-
-sub _build_backup_file {
-    my $self = shift;
-    my $path = $self->_input_file->filepath;
-    my $name = $self->_input_file->filename;
-    return "${path}${name}.bak";
-}
-
-=head2 _build__input_file
-
-Turn the string input_file into a filehandle with
-L<IO::All>.
-
-=cut
-
-sub _build__input_file {
-    my $self = shift;
-    return to_IO_All( $self->input_file );
-}
-
-=head2 _build_output_file
-
-Tack a ".new" onto the end of the input_file.
-
-=cut
-
-sub _build_output_file {
-    my $self = shift;
-    my $path = $self->_input_file->filepath;
-    my $name = $self->_input_file->filename;
-    return "${path}${name}.new";
-}
-
-=head2 _build_parsed_file
-
-Turn the L<IO::All> filehandle into a L<Net::DNS::Zonefile>
-object, so that we can extract the SPF records.
-
-=cut
-
-sub _build_parsed_file {
-    my $self = shift;
-    my $path = $self->_input_file->filepath;
-    my $name = $self->_input_file->filename;
-    return Net::DNS::ZoneFile->new("${path}${name}");
-}
-
-=head2 _build_resource_records
-
-Extract all the resource records from the L<Net::DNS::Zonefile>.
-
-=cut
-
-sub _build__resource_records {
-    my $self             = shift;
-    my @resource_records = $self->parsed_file->read;
-    return \@resource_records;
 }
 
 =head2 _build__spf_records
@@ -521,10 +437,8 @@ Returns a scalar string of the data written to the file.
 sub write {
     my $self  = shift;
     my $lines = $self->_new_records_lines;
-    my $path  = $self->_input_file->filepath;
-    my $name  = $self->_input_file->filename;
-    io( $self->backup_file )->print( $self->_input_file->all );
-    io( $self->output_file )->print(@$lines);
+    $self->backup_file->spew([ $self->input_file->slurp ]);
+    $self->output_file->spew($lines);
     return join( '', @$lines );
 }
 
@@ -1010,7 +924,7 @@ sub _new_records_lines {
             push @record_strings, @$record_string;
         }
     }
-    my @original_lines = $self->_input_file->slurp;
+    my @original_lines = $self->input_file->slurp;
     my @new_lines      = ();
     my @spf_indices;
     my $i = 0;
