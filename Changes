@@ -1,6 +1,11 @@
 Revision history for {{$dist->name}}
 
 {{$NEXT}}
+    - Add PkgVersion Dist::Zilla plugin.
+      Chris Weyl (https://github.com/RsrchBoy)
+    - Give Campus Explorer, Inc., copyright.
+
+0.010
     - Another sorting fix for single records and
       test failures on 5.18.
 

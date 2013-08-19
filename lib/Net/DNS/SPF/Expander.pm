@@ -1043,10 +1043,11 @@ Amiri Barksdale E<lt>amiri@campusexplorer.comE<gt>
 =head2 CONTRIBUTORS
 
 Neil Bowers E<lt>neil@bowers.comE<gt>
+Chris Weyl E<lt>cweyl@campusexplorer.comE<gt>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2013 the Net::DNS::SPF::Expander L</AUTHOR> listed above.
+Copyright (c) 2013 Campus Explorer, Inc.
 
 =head1 LICENSE
 
