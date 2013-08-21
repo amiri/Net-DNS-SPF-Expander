@@ -6,6 +6,7 @@ Revision history for {{$dist->name}}
     - Please remember that addition and subtraction
       are commutative. Ahem.
     - Tests for max length.
+    - Replace tabs in Net::DNS::RR->string output.
 
 0.011     2013-08-19
     - Add PkgVersion Dist::Zilla plugin.
