@@ -2,6 +2,11 @@ Revision history for {{$dist->name}}
 
 {{$NEXT}}
 
+0.012     2013-08-21
+    - Please remember that addition and subtraction
+      are commutative. Ahem.
+    - Tests for max length.
+
 0.011     2013-08-19
     - Add PkgVersion Dist::Zilla plugin.
       Chris Weyl (https://github.com/RsrchBoy)

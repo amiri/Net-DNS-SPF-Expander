@@ -214,7 +214,7 @@ has 'maximum_record_length' => (
     is      => 'ro',
     isa     => 'Int',
     default => sub {
-        256 - length('v=spf1 ') + length(' ~all');
+        255 - length('v=spf1 ') - length(' ~all') - length('"') - length('"');
     },
 );
 
@@ -1043,6 +1043,7 @@ Amiri Barksdale E<lt>amiri@campusexplorer.comE<gt>
 =head2 CONTRIBUTORS
 
 Neil Bowers E<lt>neil@bowers.comE<gt>
+
 Chris Weyl E<lt>cweyl@campusexplorer.comE<gt>
 
 =head1 COPYRIGHT
