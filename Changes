@@ -1,6 +1,8 @@
 Revision history for {{$dist->name}}
 
 {{$NEXT}}
+
+0.011     2013-08-19
     - Add PkgVersion Dist::Zilla plugin.
       Chris Weyl (https://github.com/RsrchBoy)
     - Give Campus Explorer, Inc., copyright.
