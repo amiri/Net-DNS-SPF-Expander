@@ -1,6 +1,8 @@
 Revision history for {{$dist->name}}
 
 {{$NEXT}}
+
+0.013     2013-10-04
     - BUG FIX: Master record strings need the
       "include:" mechanism before each component.
       This is a breaking bug, now fixed.
