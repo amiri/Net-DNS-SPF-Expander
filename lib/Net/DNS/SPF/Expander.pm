@@ -929,7 +929,7 @@ in _get_multiple_record_strings, e.g.,
 sub _get_master_record_strings {
     my ( $self, $values, $domains ) = @_;
 
-    my $origin         = $self->origin;
+    (my $origin         = $self->origin) =~ s/\.$//g;
     my @record_strings = ();
 
     my @containing_records = ();

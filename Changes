@@ -1,6 +1,12 @@
 Revision history for {{$dist->name}}
 
 {{$NEXT}}
+    - Fixes for test failures:
+      http://www.cpantesters.org/distro/N/Net-DNS-SPF-Expander.html
+      Make sure the origin does not contain a
+      trailing period in the master strings, and
+      change some test data from real-world DNS
+      changes.
 
 0.013     2013-10-04
     - BUG FIX: Master record strings need the
