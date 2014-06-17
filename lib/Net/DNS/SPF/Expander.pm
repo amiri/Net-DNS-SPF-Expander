@@ -826,9 +826,6 @@ sub _get_single_record_string {
     my @record_strings = ();
 
     my @sorted_record_set = map { $_ }
-        # We sort first by the string, and then by the type,
-        # so that TXT goes first, before SPF.
-        sort  { $b->type cmp $a->type }
         sort  { $a->string cmp $b->string }
     @$record_set;
 
@@ -904,8 +901,6 @@ sub _get_multiple_record_strings {
     }
 
     @record_strings = map { my $string = $self->_normalize_record_name( $_->string ) . "\n"; $string =~ s/\t/    /g; $string; }
-        # We sort first by the string, and then by the type,
-        sort  { $b->type cmp $a->type }
         sort  { $a->string cmp $b->string }
     @containing_records;
 
@@ -944,9 +939,6 @@ sub _get_master_record_strings {
     }
 
     @record_strings = map { my $string = $self->_normalize_record_name( $_->string ) . "\n"; $string =~ s/\t/    /g; $string; }
-        # We sort first by the string, and then by the type,
-        # so that TXT goes first, before SPF.
-        sort  { $b->type cmp $a->type }
         sort  { $a->string cmp $b->string }
     @containing_records;
 
