@@ -275,7 +275,7 @@ has '_resource_records' => (
 
 =head2 _spf_records
 
-An arrayref of the L<Net::DNS::RR::TXT>
+An arrayref of the L<Net::DNS::RR::TXT> or L<Net::DNS::RR::SPF>
 records found in the entire parsed_file.
 
 =cut
