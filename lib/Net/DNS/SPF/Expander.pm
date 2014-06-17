@@ -728,16 +728,14 @@ sub _new_records_from_arrayref {
 
 
     my @new_records = ();
-    for my $type ( 'TXT' ) {
-        push @new_records,
-            new Net::DNS::RR(
-                type    => $type,
-                name    => $domain,
-                class   => $self->_record_class,
-                ttl     => $self->ttl,
-                txtdata => join( ' ', @$expansions ),
-            );
-    }
+    push @new_records,
+        new Net::DNS::RR(
+            type    => 'TXT',
+            name    => $domain,
+            class   => $self->_record_class,
+            ttl     => $self->ttl,
+            txtdata => join( ' ', @$expansions ),
+        );
     return \@new_records;
 }
 
@@ -892,19 +890,17 @@ sub _get_multiple_record_strings {
 
     my @containing_records = ();
 
-    for my $type ( 'TXT' ) {
-        my $i = 1;
-        for my $value (@$values) {
-            push @containing_records,
-                new Net::DNS::RR(
-                    type    => $type,
-                    name    => "_spf$i.$origin",
-                    class   => $self->_record_class,
-                    ttl     => $self->ttl,
-                    txtdata => 'v=spf1 ' . $value,
-                );
-            $i++;
-        }
+    my $i = 1;
+    for my $value (@$values) {
+        push @containing_records,
+            new Net::DNS::RR(
+                type    => 'TXT',
+                name    => "_spf$i.$origin",
+                class   => $self->_record_class,
+                ttl     => $self->ttl,
+                txtdata => 'v=spf1 ' . $value,
+            );
+        $i++;
     }
 
     @record_strings = map { my $string = $self->_normalize_record_name( $_->string ) . "\n"; $string =~ s/\t/    /g; $string; }
@@ -932,21 +928,19 @@ sub _get_master_record_strings {
     my @record_strings = ();
 
     my @containing_records = ();
-    for my $type ( 'TXT' ) {
-        for my $domain (@$domains) {
+    for my $domain (@$domains) {
 
-            push @containing_records,
-                new Net::DNS::RR(
-                    type    => $type,
-                    name    => $domain,
-                    class   => $self->_record_class,
-                    ttl     => $self->ttl,
-                    txtdata => 'v=spf1 ' . (join(
-                        ' ',
-                        ( map {"include:_spf$_.$origin"} ( 1 .. scalar(@$values) ) )
-                    )) . ' ~all',
-                );
-        }
+        push @containing_records,
+            new Net::DNS::RR(
+                type    => 'TXT',
+                name    => $domain,
+                class   => $self->_record_class,
+                ttl     => $self->ttl,
+                txtdata => 'v=spf1 ' . (join(
+                    ' ',
+                    ( map {"include:_spf$_.$origin"} ( 1 .. scalar(@$values) ) )
+                )) . ' ~all',
+            );
     }
 
     @record_strings = map { my $string = $self->_normalize_record_name( $_->string ) . "\n"; $string =~ s/\t/    /g; $string; }
