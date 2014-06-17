@@ -5,7 +5,7 @@ use lib 'lib';
 use Net::DNS::SPF::Expander;
 use Data::Printer;
 
-use Test::More tests => 17;
+use Test::More tests => 9;
 use Test::Exception;
 
 my $file_to_expand = 't/etc/test_zonefile_complex';

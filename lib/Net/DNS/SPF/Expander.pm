@@ -275,7 +275,7 @@ has '_resource_records' => (
 
 =head2 _spf_records
 
-An arrayref of the L<Net::DNS::RR::TXT> or L<Net::DNS::RR::SPF>
+An arrayref of the L<Net::DNS::RR::TXT>
 records found in the entire parsed_file.
 
 =cut
@@ -728,7 +728,7 @@ sub _new_records_from_arrayref {
 
 
     my @new_records = ();
-    for my $type ( 'TXT', 'SPF' ) {
+    for my $type ( 'TXT' ) {
         push @new_records,
             new Net::DNS::RR(
                 type    => $type,
@@ -892,7 +892,7 @@ sub _get_multiple_record_strings {
 
     my @containing_records = ();
 
-    for my $type ( 'TXT', 'SPF' ) {
+    for my $type ( 'TXT' ) {
         my $i = 1;
         for my $value (@$values) {
             push @containing_records,
@@ -909,7 +909,6 @@ sub _get_multiple_record_strings {
 
     @record_strings = map { my $string = $self->_normalize_record_name( $_->string ) . "\n"; $string =~ s/\t/    /g; $string; }
         # We sort first by the string, and then by the type,
-        # so that TXT goes first, before SPF.
         sort  { $b->type cmp $a->type }
         sort  { $a->string cmp $b->string }
     @containing_records;
@@ -933,7 +932,7 @@ sub _get_master_record_strings {
     my @record_strings = ();
 
     my @containing_records = ();
-    for my $type ( 'TXT', 'SPF' ) {
+    for my $type ( 'TXT' ) {
         for my $domain (@$domains) {
 
             push @containing_records,
