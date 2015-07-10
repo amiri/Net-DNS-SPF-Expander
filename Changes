@@ -1,6 +1,11 @@
 Revision history for {{$dist->name}}
 
 {{$NEXT}}
+    - Fixes for test failures
+    - Split master record into a set of nested includes when
+      the master record itself grows longer than 255 characters.
+
+0.014     2013-12-24
     - Fixes for test failures:
       http://www.cpantesters.org/distro/N/Net-DNS-SPF-Expander.html
       Make sure the origin does not contain a

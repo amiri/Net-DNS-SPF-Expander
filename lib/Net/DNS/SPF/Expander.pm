@@ -753,7 +753,7 @@ then call _new_records_from_arrayref on each of the resulting partitions.
 =cut
 
 sub _new_records_from_partition {
-    my ( $self, $domain, $elements ) = @_;
+    my ( $self, $domain, $elements, $partitions_only ) = @_;
     my $record_string = join( ' ', @$elements );
     my $record_length = length($record_string);
     my $max_length    = $self->maximum_record_length;
@@ -804,6 +804,7 @@ sub _new_records_from_partition {
         push @partitions, [ split( ' ', $substring ) ];
         $partition_offset = $split_point;
     }
+	return \@partitions if $partitions_only;
 
     my @return = ();
 
@@ -885,7 +886,7 @@ they don't need the trailing ~all.
 =cut
 
 sub _get_multiple_record_strings {
-    my ( $self, $values ) = @_;
+    my ( $self, $values, $start_index ) = @_;
     my $origin = $self->origin;
 
     my @record_strings = ();
@@ -893,7 +894,7 @@ sub _get_multiple_record_strings {
     my @containing_records = ();
 
     for my $type ( 'TXT', 'SPF' ) {
-        my $i = 1;
+        my $i = $start_index // 1;
         for my $value (@$values) {
             push @containing_records,
                 new Net::DNS::RR(
@@ -933,21 +934,58 @@ sub _get_master_record_strings {
     my @record_strings = ();
 
     my @containing_records = ();
-    for my $type ( 'TXT', 'SPF' ) {
-        for my $domain (@$domains) {
+    my $additional_records = [];
 
-            push @containing_records,
+    my $master_records = [ map {"include:_spf$_.$origin"} ( 1 .. scalar(@$values)) ];
+    my $master_record = join(' ', @$master_records);
+
+    # If our master record will be too long, split it into a set of nested includes
+    if (length($master_record) > $self->maximum_record_length) {
+
+        my $new_master_record_partitions = $self->_new_records_from_partition(
+            "master",
+            $master_records,
+            1, # Just return raw partitions
+        );
+
+        for my $type ( 'TXT', 'SPF' ) {
+            for my $domain (@$domains) {
+
+                push @containing_records, new Net::DNS::RR(
+                    type    => $type,
+                    name    => $domain,
+                    class   => $self->_record_class,
+                    ttl     => $self->ttl,
+                    txtdata => 'v=spf1 ' . (join(
+                    ' ',
+                    ( map {"include:_spf$_.$origin"} ( (scalar(@$values) + 1 ) .. (scalar(@$values) + scalar(@$new_master_record_partitions) ) ) )
+                    )) . ' ~all',
+                );
+            }
+        }
+        # Create the new _spfN.domain.tld records that we are including.
+        $additional_records = $self->_get_multiple_record_strings([map {join('', @$_)} @$new_master_record_partitions], scalar(@$values) + 1);
+
+    # Otherwise, proceed as normal, and just use one master record with all the original _spfN.domain.tld records we already have.
+    } else {
+
+        for my $type ( 'TXT', 'SPF' ) {
+            for my $domain (@$domains) {
+
+                push @containing_records,
                 new Net::DNS::RR(
                     type    => $type,
                     name    => $domain,
                     class   => $self->_record_class,
                     ttl     => $self->ttl,
                     txtdata => 'v=spf1 ' . (join(
-                        ' ',
-                        ( map {"include:_spf$_.$origin"} ( 1 .. scalar(@$values) ) )
+                    ' ',
+                    ( map {"include:_spf$_.$origin"} ( 1 .. scalar(@$values) ) )
                     )) . ' ~all',
                 );
+            }
         }
+
     }
 
     @record_strings = map { my $string = $self->_normalize_record_name( $_->string ) . "\n"; $string =~ s/\t/    /g; $string; }
@@ -957,7 +995,10 @@ sub _get_master_record_strings {
         sort  { $a->string cmp $b->string }
     @containing_records;
 
-    return \@record_strings;
+    # Be sure to add the additional records if we have them.
+    my @result = (@record_strings,@$additional_records);
+
+    return \@result;
 }
 
 =head2 _new_records_lines
@@ -1049,7 +1090,7 @@ Chris Weyl E<lt>cweyl@campusexplorer.comE<gt>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2013 Campus Explorer, Inc.
+Copyright (c) 2015 Campus Explorer, Inc.
 
 =head1 LICENSE
 
