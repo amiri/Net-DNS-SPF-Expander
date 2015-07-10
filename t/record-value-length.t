@@ -5,7 +5,7 @@ use lib 'lib';
 use Net::DNS::SPF::Expander;
 use Data::Printer;
 
-use Test::More tests => 21;
+use Test::More;
 use Test::Exception;
 
 my $file_to_expand = 't/etc/test_zonefile_complex';
@@ -29,3 +29,4 @@ for my $zone ( keys %$new_spf_records ) {
         }
     }
 }
+done_testing;
