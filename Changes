@@ -1,6 +1,11 @@
 Revision history for {{$dist->name}}
 
 {{$NEXT}}
+    - Undo splitting into nested includes, and just
+      split the *string* into multiple parts. See
+      http://tools.ietf.org/html/rfc4408#section-3.1.3
+
+0.015     2015-07-10
     - Fixes for test failures
     - Split master record into a set of nested includes when
       the master record itself grows longer than 255 characters.

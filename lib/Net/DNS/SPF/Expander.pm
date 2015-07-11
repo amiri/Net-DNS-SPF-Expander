@@ -934,12 +934,11 @@ sub _get_master_record_strings {
     my @record_strings = ();
 
     my @containing_records = ();
-    my $additional_records = [];
 
     my $master_records = [ map {"include:_spf$_.$origin"} ( 1 .. scalar(@$values)) ];
     my $master_record = join(' ', @$master_records);
 
-    # If our master record will be too long, split it into a set of nested includes
+    # If our master record will be too long, split it into multiple strings
     if (length($master_record) > $self->maximum_record_length) {
 
         my $new_master_record_partitions = $self->_new_records_from_partition(
@@ -948,25 +947,38 @@ sub _get_master_record_strings {
             1, # Just return raw partitions
         );
 
+        my @master_record_strings = ();
+        my $i = 0;
+        for my $partition (@$new_master_record_partitions) {
+            my @master_record_partition = @$master_records[$i .. ($i + $#{$partition})];
+            push @master_record_strings, join(' ', @master_record_partition);
+            $i += scalar(@$partition);
+        }
+        $master_record_strings[0] = 'v=spf1 '. $master_record_strings[0];
+        $master_record_strings[-1] = $master_record_strings[-1].' ~all';
+        my $master_record_string = '';
+        my $index = 0;
+        for my $master_record (@master_record_strings) {
+                $master_record = " ".$master_record unless $index == 0;
+                $master_record_string .= qq|"$master_record"|;
+                $index++;
+        }
+
         for my $type ( 'TXT', 'SPF' ) {
             for my $domain (@$domains) {
 
-                push @containing_records, new Net::DNS::RR(
+                push @containing_records,
+                new Net::DNS::RR(
                     type    => $type,
                     name    => $domain,
                     class   => $self->_record_class,
                     ttl     => $self->ttl,
-                    txtdata => 'v=spf1 ' . (join(
-                    ' ',
-                    ( map {"include:_spf$_.$origin"} ( (scalar(@$values) + 1 ) .. (scalar(@$values) + scalar(@$new_master_record_partitions) ) ) )
-                    )) . ' ~all',
+                    txtdata => \@master_record_strings,
                 );
             }
         }
-        # Create the new _spfN.domain.tld records that we are including.
-        $additional_records = $self->_get_multiple_record_strings([map {join('', @$_)} @$new_master_record_partitions], scalar(@$values) + 1);
 
-    # Otherwise, proceed as normal, and just use one master record with all the original _spfN.domain.tld records we already have.
+    # Otherwise, proceed as normal
     } else {
 
         for my $type ( 'TXT', 'SPF' ) {
@@ -988,17 +1000,14 @@ sub _get_master_record_strings {
 
     }
 
-    @record_strings = map { my $string = $self->_normalize_record_name( $_->string ) . "\n"; $string =~ s/\t/    /g; $string; }
+    @record_strings = map { my $string = $self->_normalize_record_name( $_->string ); $string =~ s/\n//g; $string =~ s/(\(|\))//g; $string =~ s/\t/    /g;$string = $string."\n"; }
         # We sort first by the string, and then by the type,
         # so that TXT goes first, before SPF.
         sort  { $b->type cmp $a->type }
         sort  { $a->string cmp $b->string }
     @containing_records;
 
-    # Be sure to add the additional records if we have them.
-    my @result = (@record_strings,@$additional_records);
-
-    return \@result;
+    return \@record_strings;
 }
 
 =head2 _new_records_lines
