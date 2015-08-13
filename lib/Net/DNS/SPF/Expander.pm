@@ -117,7 +117,8 @@ onto the end of the original filename.
 has 'output_file' => (
     is         => 'ro',
     isa        => 'Str',
-    lazy_build => 1,
+    lazy       => 1,
+    builder    => '_build_output_file',
 );
 
 =head2 backup_file
@@ -130,8 +131,9 @@ onto the end of the original filename.
 has 'backup_file' => (
     is         => 'ro',
     isa        => IO_All,
-    lazy_build => 1,
+    lazy       => 1,
     coerce     => 1,
+    builder    => '_build_backup_file',
 );
 
 =head2 nameservers
@@ -154,7 +156,8 @@ The L<Net::DNS::Zonefile> object created from the input_file.
 has 'parsed_file' => (
     is         => 'ro',
     isa        => 'Net::DNS::ZoneFile',
-    lazy_build => 1,
+    lazy       => 1,
+    builder    => '_build_parsed_file',
 );
 
 =head2 to_expand
@@ -242,7 +245,8 @@ or you can set it if you like.
 has 'origin' => (
     is         => 'ro',
     isa        => 'Str',
-    lazy_build => 1,
+    lazy       => 1,
+    builder    => '_build_origin',
 );
 
 =head1 PRIVATE ATTRIBUTES
@@ -257,7 +261,8 @@ has '_input_file' => (
     is         => 'ro',
     isa        => IO_All,
     coerce     => 1,
-    lazy_build => 1,
+    lazy       => 1,
+    builder    => '_build__input_file',
 );
 
 =head2 _resource_records
@@ -270,7 +275,8 @@ found in the entire parsed_file.
 has '_resource_records' => (
     is         => 'ro',
     isa        => 'Maybe[ArrayRef[Net::DNS::RR]]',
-    lazy_build => 1,
+    lazy       => 1,
+    builder    => '_build__resource_records',
 );
 
 =head2 _spf_records
@@ -283,7 +289,8 @@ records found in the entire parsed_file.
 has '_spf_records' => (
     is         => 'ro',
     isa        => 'Maybe[ArrayRef[Net::DNS::RR]]',
-    lazy_build => 1,
+    lazy       => 1,
+    builder    => '_build__spf_records',
 );
 
 =head2 _resolver
@@ -297,7 +304,8 @@ variables if you want to change the nameserver it uses.
 has '_resolver' => (
     is         => 'ro',
     isa        => 'Net::DNS::Resolver',
-    lazy_build => 1,
+    lazy       => 1,
+    builder    => '_build__resolver',
 );
 
 =head2 _expansions
@@ -331,7 +339,8 @@ They are alpha sorted in the final results for predictability in tests.
 has '_expansions' => (
     is         => 'ro',
     isa        => 'HashRef',
-    lazy_build => 1,
+    lazy       => 1,
+    builder    => '_build__expansions',
 );
 
 =head2 _lengths_of_expansions
@@ -346,7 +355,8 @@ pieces.
 has '_lengths_of_expansions' => (
     is         => 'ro',
     isa        => 'HashRef',
-    lazy_build => 1,
+    lazy       => 1,
+    builder    => '_build__lengths_of_expansions',
 );
 
 =head2 _record_class
