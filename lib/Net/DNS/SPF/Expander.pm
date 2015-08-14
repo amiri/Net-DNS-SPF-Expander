@@ -736,6 +736,7 @@ SPF record.
 sub _new_records_from_arrayref {
     my ( $self, $domain, $expansions ) = @_;
 
+    my $txtdata = join(' ', @$expansions);
 
     my @new_records = ();
     push @new_records, new Net::DNS::RR(
@@ -743,7 +744,7 @@ sub _new_records_from_arrayref {
         name    => $domain,
         class   => $self->_record_class,
         ttl     => $self->ttl,
-        txtdata => join( ' ', @$expansions ),
+        txtdata => $txtdata,
     );
     return \@new_records;
 }
@@ -811,7 +812,7 @@ sub _new_records_from_partition {
         push @partitions, [ split( ' ', $substring ) ];
         $partition_offset = $split_point;
     }
-	return \@partitions if $partitions_only;
+    return \@partitions if $partitions_only;
 
     my @return = ();
 
@@ -842,8 +843,8 @@ sub _get_single_record_string {
     for my $record (@sorted_record_set) {
         $record->name($domain);
         $record->txtdata( 'v=spf1 ' . $record->txtdata . ' ~all' );
-        my $string = $self->_normalize_record_name( $record->string ) . "\n";
-        $string =~ s/\t/    /g;
+
+        my $string = $self->_normalize_record_name( $record->string );
         push @record_strings, $string;
     }
     return \@record_strings;
@@ -876,6 +877,14 @@ sub _normalize_record_name {
         $name = $original_name;
     }
     $record =~ s/\Q$original_name\E/$name/g;
+    $record =~ s/\n//g;
+    $record =~ s/(\(|\))//g;
+    $record =~ s/\t\s/\t/g;
+    $record =~ s/\s\t/\t/g;
+    $record =~ s/\t\t/\t/g;
+    $record =~ s/\t/    /g;
+    $record =~ s/\s/ /g;
+    $record = $record."\n";
     return $record;
 }
 
@@ -910,9 +919,11 @@ sub _get_multiple_record_strings {
         $i++;
     }
 
-    @record_strings = map { my $string = $self->_normalize_record_name( $_->string ) . "\n"; $string =~ s/\t/    /g; $string; }
-        sort  { $a->string cmp $b->string }
-    @containing_records;
+    @record_strings = map {
+        $self->_normalize_record_name($_->string)
+    } sort {
+        $a->string cmp $b->string
+    } @containing_records;
 
     return \@record_strings;
 }
@@ -995,9 +1006,11 @@ sub _get_master_record_strings {
 
     }
 
-    @record_strings = map { my $string = $self->_normalize_record_name( $_->string ); $string =~ s/\n//g; $string =~ s/(\(|\))//g; $string =~ s/\t/    /g;$string = $string."\n"; }
-        sort  { $a->string cmp $b->string }
-    @containing_records;
+    @record_strings = map {
+        $self->_normalize_record_name($_->string)
+    } sort {
+        $a->string cmp $b->string
+    } @containing_records;
 
     return \@record_strings;
 }
@@ -1037,6 +1050,7 @@ sub _new_records_lines {
             && ref( ${ $new_records{$_} }[0] ) eq 'ARRAY'
     } sort keys %new_records;
     if ($make_autosplit_records) {
+        warn "I am making autosplit records";
         my $master_record_strings
             = $self->_get_master_record_strings( \@autosplit,
             [ keys %new_records ] );
@@ -1045,6 +1059,7 @@ sub _new_records_lines {
         push @record_strings, @$master_record_strings;
         push @record_strings, @$record_strings;
     } else {
+        warn "I am not making autosplit records";
         for my $domain ( sort keys %new_records ) {
             my $record_string = $self->_get_single_record_string(
                 $domain,
@@ -1069,6 +1084,12 @@ LINE: for my $line (@original_lines) {
     my @last_segment  = @new_lines[ $spf_indices[-1] + 1 .. $#new_lines ];
     my @final_lines   = ( @first_segment, @record_strings, @last_segment );
 
+    for my $line (@final_lines) {
+        $line =~ s/\t/    /g;
+        $line =~ s/\n\s+/\n/g;
+        $line =~ s/\s+\n/\n/g;
+        $line =~ s/\n+/\n/g;
+    }
     return \@final_lines;
 }
 
