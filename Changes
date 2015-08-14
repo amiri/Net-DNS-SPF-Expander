@@ -2,6 +2,12 @@ Revision history for {{$dist->name}}
 
 {{$NEXT}}
 
+0.017     2015-08-14
+    - Stop making SPF RRs when TXT is the only one that
+      should be made. Marc Bradshaw (https://github.com/marcbradshaw)
+    - Cease using deprecated lazy_build! Karen Etheridge (https://github.com/karenetheridge)
+    - Repair file content tests, finally
+
 0.016     2015-07-10
     - Undo splitting into nested includes, and just
       split the *string* into multiple parts. See

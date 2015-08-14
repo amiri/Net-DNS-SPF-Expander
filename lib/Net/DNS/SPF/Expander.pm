@@ -1106,6 +1106,10 @@ Amiri Barksdale E<lt>amiri@campusexplorer.comE<gt>
 
 Neil Bowers E<lt>neil@bowers.comE<gt>
 
+Marc Bradshaw E<lt>marc@marcbradshaw.netE<gt>
+
+Karen Etheridge E<lt>ether@cpan.orgE<gt>
+
 Chris Weyl E<lt>cweyl@campusexplorer.comE<gt>
 
 =head1 COPYRIGHT
