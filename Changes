@@ -1,7 +1,5 @@
 Revision history for {{$dist->name}}
 
-{{$NEXT}}
-
 0.017     2015-08-14
     - Stop making SPF RRs when TXT is the only one that
       should be made. Marc Bradshaw (https://github.com/marcbradshaw)
