@@ -1050,7 +1050,6 @@ sub _new_records_lines {
             && ref( ${ $new_records{$_} }[0] ) eq 'ARRAY'
     } sort keys %new_records;
     if ($make_autosplit_records) {
-        warn "I am making autosplit records";
         my $master_record_strings
             = $self->_get_master_record_strings( \@autosplit,
             [ keys %new_records ] );
@@ -1059,7 +1058,6 @@ sub _new_records_lines {
         push @record_strings, @$master_record_strings;
         push @record_strings, @$record_strings;
     } else {
-        warn "I am not making autosplit records";
         for my $domain ( sort keys %new_records ) {
             my $record_string = $self->_get_single_record_string(
                 $domain,
