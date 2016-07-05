@@ -1,5 +1,9 @@
 Revision history for {{$dist->name}}
 
+0.018   2016-07-05
+    - Repair file content tests,
+    - Stricter record length treatment
+
 0.017     2015-08-14
     - Stop making SPF RRs when TXT is the only one that
       should be made. Marc Bradshaw (https://github.com/marcbradshaw)

@@ -719,7 +719,7 @@ KEY: for my $key ( keys %$expansions ) {
         }
     }
     # We sort these so we can be sure of the order in tests.
-    my @return = uniq sort ( @leading, @elements, @trailing );
+    my @return = uniq sort { $a cmp $b } ( @leading, @elements, @trailing );
     return \@return;
 }
 
@@ -775,7 +775,7 @@ sub _new_records_from_partition {
         $result = index( $record_string, ' ', $offset );
     }
 
-    my $number_of_partitions = int( $record_length / $max_length )
+    my $number_of_partitions = int($record_length / $max_length + 0.5)
         + ( ( $record_length % $max_length ) ? 1 : 0 );
 
     my @partitions       = ();
