@@ -5,7 +5,7 @@ use IO::All -utf8;
 use Net::DNS::ZoneFile;
 use Net::DNS::Resolver;
 use MooseX::Types::IO::All 'IO_All';
-use List::AllUtils qw(sum any part first uniq);
+use List::Util 1.45 qw(any first uniq);
 use Scalar::Util ();
 
 with 'MooseX::Getopt';
