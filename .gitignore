@@ -1,2 +1,7 @@
+/.ackrc
+/.build/
+!/.gitignore
+/Net-DNS-SPF-Expander-*/
+/Net-DNS-SPF-Expander-*.tar.gz
 t/etc/*.new
 t/etc/*.bak
