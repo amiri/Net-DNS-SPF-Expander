@@ -1,11 +1,11 @@
 package Net::DNS::SPF::Expander;
-
+$Net::DNS::SPF::Expander::VERSION = '0.020';
 use Moose;
 use IO::All -utf8;
 use Net::DNS::ZoneFile;
 use Net::DNS::Resolver;
 use MooseX::Types::IO::All 'IO_All';
-use List::Util 1.45 qw(any first uniq);
+use List::AllUtils qw(sum any part first uniq);
 use Scalar::Util ();
 
 with 'MooseX::Getopt';
@@ -103,7 +103,8 @@ to expand. It must be a valid L<Net::DNS::Zonefile> zonefile.
 
 has 'input_file' => (
     is       => 'ro',
-    isa      => 'Str',
+    isa      => IO_All,
+    coerce   => 1,
     required => 1,
 );
 
@@ -250,20 +251,6 @@ has 'origin' => (
 );
 
 =head1 PRIVATE ATTRIBUTES
-
-=head2 _input_file
-
-The L<IO::All> object created from the input_file.
-
-=cut
-
-has '_input_file' => (
-    is         => 'ro',
-    isa        => IO_All,
-    coerce     => 1,
-    lazy       => 1,
-    builder    => '_build__input_file',
-);
 
 =head2 _resource_records
 
@@ -420,21 +407,9 @@ Tack a ".bak" onto the end of the input_file.
 
 sub _build_backup_file {
     my $self = shift;
-    my $path = $self->_input_file->filepath;
-    my $name = $self->_input_file->filename;
+    my $path = $self->input_file->filepath;
+    my $name = $self->input_file->filename;
     return "${path}${name}.bak";
-}
-
-=head2 _build__input_file
-
-Turn the string input_file into a filehandle with
-L<IO::All>.
-
-=cut
-
-sub _build__input_file {
-    my $self = shift;
-    return to_IO_All( $self->input_file );
 }
 
 =head2 _build_output_file
@@ -445,8 +420,8 @@ Tack a ".new" onto the end of the input_file.
 
 sub _build_output_file {
     my $self = shift;
-    my $path = $self->_input_file->filepath;
-    my $name = $self->_input_file->filename;
+    my $path = $self->input_file->filepath;
+    my $name = $self->input_file->filename;
     return "${path}${name}.new";
 }
 
@@ -459,8 +434,8 @@ object, so that we can extract the SPF records.
 
 sub _build_parsed_file {
     my $self = shift;
-    my $path = $self->_input_file->filepath;
-    my $name = $self->_input_file->filename;
+    my $path = $self->input_file->filepath;
+    my $name = $self->input_file->filename;
     return Net::DNS::ZoneFile->new("${path}${name}");
 }
 
@@ -531,9 +506,7 @@ Returns a scalar string of the data written to the file.
 sub write {
     my $self  = shift;
     my $lines = $self->_new_records_lines;
-    my $path  = $self->_input_file->filepath;
-    my $name  = $self->_input_file->filename;
-    io( $self->backup_file )->print( $self->_input_file->all );
+    io( $self->backup_file )->print( $self->input_file->all );
     io( $self->output_file )->print(@$lines);
     return join( '', @$lines );
 }
@@ -1066,7 +1039,7 @@ sub _new_records_lines {
             push @record_strings, @$record_string;
         }
     }
-    my @original_lines = $self->_input_file->slurp;
+    my @original_lines = $self->input_file->slurp;
     my @new_lines      = ();
     my @spf_indices;
     my $i = 0;
@@ -1114,7 +1087,7 @@ Chris Weyl E<lt>cweyl@campusexplorer.comE<gt>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2015 Campus Explorer, Inc.
+Copyright (c) 2019 Campus Explorer, Inc.
 
 =head1 LICENSE
 

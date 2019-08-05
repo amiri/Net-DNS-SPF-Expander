@@ -1,6 +1,8 @@
 Revision history for {{$dist->name}}
 
-    - switch from List::AllUtils to List::Util (in core)
+0.020   2019-08-05
+    - Remove _input_file, don't use to_IO_All coercion manually for simplicity.
+    - switch from List::AllUtils to List::Util (in core): Thanks, Ether.
 
 0.019   2017-05-29
     - Fix tests again, not specific IPs, but just regexes 
